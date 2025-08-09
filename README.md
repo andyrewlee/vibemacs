@@ -1,16 +1,14 @@
-# Vibemacs
+# vibemacs
 
-Emacs for vibe coders.
+emacs for vibe coders
 
-## Installation (Mac)
-
-First install emacs-mac
+## installation (mac)
 
 ```
 brew install emacs
 ```
 
-Then clone the repo and rename to `.emacs.d`
+clone repo and rename to `.emacs.d`
 
 ```
 cd ~
