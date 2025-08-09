@@ -62,8 +62,29 @@
 (vibemacs/leader
   "SPC" '(execute-extended-command :which-key "M-x")
   "TAB" '(mode-line-other-buffer :which-key "previous buffer")
+  ;; toggle
+  "tl"  '(display-line-numbers-mode :which-key "toggle line number")
+  ;; window
+  "ws"  '(vibemacs/split-window-below-and-switch :which-key "horizontal split")
+  "wv"  '(vibemacs/split-window-right-and-switch :which-key "vertical split")
+  "wk"  '(windmove-up :which-key "move to top window")
+  "wl"  '(windmove-right :which-key "move to right rindow")
+  "wh"  '(windmove-left :which-key "move to left window")
+  "wj"  '(windmove-down :which-key "move to bottom window")
   ;; buffer
   "be"  '(eval-buffer :which-key "eval buffer")
   "bn"  '(next-buffer :which-key "next buffer")
   "bp"  '(previous-buffer :which-key "previous buffer")
   "bm"  '(buffer-menu :which-key "list buffers"))
+
+;; horizontal split and focus
+(defun vibemacs/split-window-below-and-switch ()
+  (interactive)
+  (split-window-below)
+  (other-window 1))
+
+;; vertical split and focus
+(defun vibemacs/split-window-right-and-switch ()
+  (interactive)
+  (split-window-right)
+  (other-window 1))
