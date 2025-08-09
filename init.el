@@ -10,7 +10,6 @@
 ;; hide top menu bar
 (menu-bar-mode -1)
 
-;; use-package
 ;; helper language for installing and configuring packages
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
@@ -26,9 +25,6 @@
   (load custom-file))
 
 ;; vim keybindings for emacs
-;; - allow C-u to scroll up
-;; - indentation size for << and >>
-;; - let other packages handle special modes
 (use-package evil
   :init
   (setq evil-want-C-u-scroll t    
@@ -52,11 +48,7 @@
   :config
   (which-key-mode 1))
 
-;; define keymaps in one places
-;; set space as global leader
-;; general.el (leader keys)
-;; - helper to define leader keymaps in one place
-;; - we set "SPC" as the global leader (with "M-SPC" as a terminal-safe fallback)
+;; define keymaps in one place with SPC as global leader
 (use-package general
   :after evil
   :config
@@ -69,5 +61,9 @@
 
 (vibemacs/leader
   "SPC" '(execute-extended-command :which-key "M-x")
+  "TAB" '(mode-line-other-buffer :which-key "previous buffer")
   ;; buffer
-  "be"  '(eval-buffer :which-key "eval buffer"))
+  "be"  '(eval-buffer :which-key "eval buffer")
+  "bn"  '(next-buffer :which-key "next buffer")
+  "bp"  '(previous-buffer :which-key "previous buffer")
+  "bm"  '(buffer-menu :which-key "list buffers"))
