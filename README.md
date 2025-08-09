@@ -1,21 +1,19 @@
-# Minimac
+# Vibemacs
 
-Minimal Emacs config for vim expatriates 🙈
+Emacs for vibe coders.
 
 ## Installation (Mac)
 
 First install emacs-mac
 
 ```
-brew tap railwaycat/emacsmacport
-brew install emacs-mac --with-modules
-ln -s /usr/local/opt/emacs-mac/Emacs.app /Applications/Emacs.app
+brew install emacs
 ```
 
 Then clone the repo and rename to `.emacs.d`
 
 ```
-cd
-git clone https://github.com/andyrewlee/minimac.git
-mv minimac .emacs.d
+cd ~
+git clone https://github.com/andyrewlee/vibemacs.git
+mv vibemacs .emacs.d
 ```
