@@ -2,3 +2,5 @@ elpa/
 auto-save-list/
 transient/
 custom.el
+projects
+libtree-*
