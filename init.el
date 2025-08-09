@@ -7,8 +7,16 @@
 ;; load installed packages
 (package-initialize)
 
-;; hide top menu bar
-(menu-bar-mode -1)
+;; gui config
+(when (fboundp 'menu-bar-mode)   (menu-bar-mode -1))
+(when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
+(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+(blink-cursor-mode -1)
+(global-display-line-numbers-mode 1)
+(pixel-scroll-precision-mode 1)
+(setq ring-bell-function 'ignore
+      inhibit-startup-screen t
+      require-final-newline t)
 
 ;; helper language for installing and configuring packages
 (unless (package-installed-p 'use-package)
@@ -132,6 +140,7 @@
 
   (apheleia-global-mode 1))
 ;; find and search
+;; brew install ripgrep
 (use-package vertico :init (vertico-mode 1))
 (use-package marginalia :init (marginalia-mode 1))
 (use-package consult)
