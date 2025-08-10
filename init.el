@@ -25,11 +25,12 @@
 (load-theme 'modus-vivendi :no-confirm)
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
+(add-hook 'before-save-hook 'delete-trailing-whitespace)
 
 ;;; vim
 (use-package evil
   :init
-  (setq evil-want-C-u-scroll t    
+  (setq evil-want-C-u-scroll t
         evil-shift-width 2
         evil-want-keybinding nil)
   :config
@@ -77,6 +78,8 @@
   "lD" '(xref-find-definitions-other-window :which-key "def (other win)")
   "lR" '(xref-find-references :which-key "find references")
   "lf" '(apheleia-format-buffer :which-key "format buffer")
+  ;; ai
+  "ac" '(claude-code-transient :which-key "claude code")
   ;; git
   "g." '(magit-dispatch :which-key "menu")
   "gs" '(magit-status :which-key "status")
@@ -174,6 +177,20 @@
         solarized-emphasize-indicators nil)
   :config
   (load-theme 'solarized-light :no-confirm))
+
+;;; claude code
+;; npm install -g @anthropic-ai/claude-code
+;; eat terminal backend
+(use-package eat :ensure t)
+;; vterm terminal backend
+(use-package vterm :ensure t)
+;; install claude-code.el
+(use-package claude-code :ensure t
+  :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
+  :config
+  (claude-code-mode)
+  :bind
+  (:repeat-map my-claude-code-map ("M" . claude-code-cycle-mode)))
 
 ;;; functions
 ;; horizontal split and focus
