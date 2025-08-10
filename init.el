@@ -17,6 +17,7 @@
 (setq ring-bell-function 'ignore
       inhibit-startup-screen t
       require-final-newline t)
+(load-theme 'modus-vivendi :no-confirm)
 
 ;; helper language for installing and configuring packages
 (unless (package-installed-p 'use-package)
@@ -41,12 +42,14 @@
   :config
   ;; enable globally
   (evil-mode 1))
-
 ;; better evil integration with many emacs modes
 (use-package evil-collection
   :after evil
   :config
   (evil-collection-init))
+;; comment
+(use-package evil-nerd-commenter
+  :after evil)
 
 ;; show popup of available keys after prefix is pressed
 (use-package which-key
@@ -56,7 +59,7 @@
   :config
   (which-key-mode 1))
 
-;; define keymaps in one place with SPC as global leader
+;; define keymaps with SPC as global leader
 (use-package general
   :after evil
   :config
@@ -73,6 +76,8 @@
   "ec"  '(vibemacs/emacs-config :which-key "emacs config")
   ;; toggle
   "tl"  '(display-line-numbers-mode :which-key "toggle line number")
+  ;; comment
+  "c" '(evilnc-comment-or-uncomment-lines :which-key "comment")
   ;; search
   "sb" '(consult-line        :which-key "search in buffer")
   "sp" '(consult-ripgrep     :which-key "search in project")
@@ -81,6 +86,15 @@
   "lD" '(xref-find-definitions-other-window :which-key "def (other win)")
   "lR" '(xref-find-references         :which-key "find references")
   "lf" '(apheleia-format-buffer :which-key "format buffer")
+  ;; git
+  "gg" '(magit-status   :which-key "status")
+  "g." '(magit-dispatch :which-key "menu")
+  "gl" '(magit-log-buffer-file :which-key "history of file")
+  "gL" '(magit-log-all         :which-key "history of repo")
+  "gb" '(magit-branch-checkout :which-key "checkout branch")
+  "gB" '(magit-branch-create   :which-key "create branch")
+  "gP" '(magit-push            :which-key "push menu")
+  "gF" '(magit-pull            :which-key "pull menu")
   ;; window
   "wS"  '(vibemacs/split-window-below-and-switch :which-key "horizontal split")
   "wV"  '(vibemacs/split-window-right-and-switch :which-key "vertical split")
@@ -144,6 +158,18 @@
 (use-package vertico :init (vertico-mode 1))
 (use-package marginalia :init (marginalia-mode 1))
 (use-package consult)
+
+;; git
+(use-package magit
+  :commands (magit-status magit-dispatch)
+  :init
+  (setq magit-display-buffer-function
+        #'magit-display-buffer-same-window-except-diff-v1))
+;; gutter highlights
+(use-package diff-hl
+  :hook ((prog-mode . diff-hl-mode)
+         (magit-post-refresh . diff-hl-magit-post-refresh)))
+
 
 ;; horizontal split and focus
 (defun vibemacs/split-window-below-and-switch ()
