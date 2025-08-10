@@ -62,48 +62,56 @@
     :prefix "SPC"
     :global-prefix "M-SPC"))
 (vibemacs/leader
-  "SPC" '(execute-extended-command :which-key "M-x")
-  "TAB" '(mode-line-other-buffer :which-key "previous buffer")
+  "SPC"  '(execute-extended-command            :which-key "M-x")
+  "TAB"  '(mode-line-other-buffer              :which-key "previous buffer")
   ;; emacs
-  "ec"  '(vibemacs/emacs-config :which-key "emacs config")
+  "ec"   '(vibemacs/emacs-config               :which-key "emacs config")
+  ;; zsh
+  "zc"   '(vibemacs/zsh-config                 :which-key "zsh config")
   ;; toggle
-  "tl"  '(display-line-numbers-mode :which-key "toggle line number")
+  "tl"   '(display-line-numbers-mode           :which-key "toggle line number")
   ;; comment
-  "c" '(evilnc-comment-or-uncomment-lines :which-key "comment")
+  "c"    '(evilnc-comment-or-uncomment-lines   :which-key "comment")
   ;; search
-  "sb" '(consult-line :which-key "search in buffer")
-  "sp" '(consult-ripgrep :which-key "search in project")
+  "sb"   '(consult-line                        :which-key "search in buffer")
+  "sp"   '(consult-ripgrep                     :which-key "search in project")
   ;; language
-  "ld" '(xref-find-definitions :which-key "go to def")
-  "lD" '(xref-find-definitions-other-window :which-key "def (other win)")
-  "lR" '(xref-find-references :which-key "find references")
-  "lf" '(apheleia-format-buffer :which-key "format buffer")
+  "ld"   '(xref-find-definitions               :which-key "go to def")
+  "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
+  "lR"   '(xref-find-references                :which-key "find references")
+  "lf"   '(apheleia-format-buffer              :which-key "format buffer")
   ;; ai
-  "ac" '(claude-code-transient :which-key "claude code")
+  "acc"  '(claude-code-transient               :which-key "claude code")
+  "agg"  '(gptel                               :which-key "chat buffer")
+  "ags"  '(gptel-send                          :which-key "send region")
+  "agr"  '(gptel-rewrite                       :which-key "rewrite region")
+  "agm"  '(gptel-menu                          :which-key "menu")
+  "agac" '(gptel-add                           :which-key "add/remove context")
+  "agaf" '(gptel-add-file                      :which-key "add file to context")
   ;; git
-  "g." '(magit-dispatch :which-key "menu")
-  "gs" '(magit-status :which-key "status")
-  "gd" '(magit-diff :which-key "git diff")
-  "gc" '(magit-commit :which-key "git commit")
-  "gl" '(magit-log-buffer-file :which-key "history of file")
-  "gL" '(magit-log-all :which-key "history of repo")
-  "gb" '(magit-branch-checkout :which-key "checkout branch")
-  "gB" '(magit-branch-create :which-key "create branch")
-  "gP" '(magit-push :which-key "push")
-  "gF" '(magit-pull :which-key "pull")
-  "gR" '(magit-rebase :which-key "rebase")
+  "g."   '(magit-dispatch                      :which-key "menu")
+  "gs"   '(magit-status                        :which-key "status")
+  "gd"   '(magit-diff                          :which-key "git diff")
+  "gc"   '(magit-commit                        :which-key "git commit")
+  "gl"   '(magit-log-buffer-file               :which-key "history of file")
+  "gL"   '(magit-log-all                       :which-key "history of repo")
+  "gb"   '(magit-branch-checkout               :which-key "checkout branch")
+  "gB"   '(magit-branch-create                 :which-key "create branch")
+  "gP"   '(magit-push                          :which-key "push")
+  "gF"   '(magit-pull                          :which-key "pull")
+  "gR"   '(magit-rebase                        :which-key "rebase")
   ;; window
-  "wS"  '(vibemacs/split-window-below-and-switch :which-key "horizontal split")
-  "wV"  '(vibemacs/split-window-right-and-switch :which-key "vertical split")
-  "wk"  '(windmove-up :which-key "move to top window")
-  "wl"  '(windmove-right :which-key "move to right rindow")
-  "wh"  '(windmove-left :which-key "move to left window")
-  "wj"  '(windmove-down :which-key "move to bottom window")
+  "wS"   '(vibemacs/horizontal-split           :which-key "horizontal split")
+  "wV"   '(vibemacs/vertical-split             :which-key "vertical split")
+  "wk"   '(windmove-up                         :which-key "move to top window")
+  "wl"   '(windmove-right                      :which-key "move to right rindow")
+  "wh"   '(windmove-left                       :which-key "move to left window")
+  "wj"   '(windmove-down                       :which-key "move to bottom window")
   ;; buffer
-  "be"  '(eval-buffer :which-key "eval buffer")
-  "bn"  '(next-buffer :which-key "next buffer")
-  "bp"  '(previous-buffer :which-key "previous buffer")
-  "bm"  '(buffer-menu :which-key "list buffers"))
+  "be"   '(eval-buffer                         :which-key "eval buffer")
+  "bn"   '(next-buffer                         :which-key "next buffer")
+  "bp"   '(previous-buffer                     :which-key "previous buffer")
+  "bm"   '(buffer-menu                         :which-key "list buffers"))
 
 ;;; typescript
 ;; npm i -g typescript typescript-language-server
@@ -192,14 +200,29 @@
   :bind
   (:repeat-map my-claude-code-map ("M" . claude-code-cycle-mode)))
 
+;;; gptel
+;; export OPENAI_API_KEY="sk-proj-XXX" to .zshrc
+;; used to read env from emacs
+(use-package exec-path-from-shell
+  :if (memq window-system '(mac ns x))
+  :init
+  (setq exec-path-from-shell-variables '("PATH" "OPENAI_API_KEY"))
+  :config
+  (exec-path-from-shell-initialize))
+(use-package gptel
+  :after exec-path-from-shell
+  :init
+  (setq gptel-api-key (getenv "OPENAI_API_KEY"))
+  :commands (gptel gptel-send gptel-menu))
+
 ;;; functions
 ;; horizontal split and focus
-(defun vibemacs/split-window-below-and-switch ()
+(defun vibemacs/horizontal-split ()
   (interactive)
   (split-window-below)
   (other-window 1))
 ;; vertical split and focus
-(defun vibemacs/split-window-right-and-switch ()
+(defun vibemacs/vertical-split ()
   (interactive)
   (split-window-right)
   (other-window 1))
@@ -207,3 +230,7 @@
 (defun vibemacs/emacs-config ()
   (interactive)
   (find-file "~/.emacs.d/init.el"))
+;; zsh config
+(defun vibemacs/zsh-config ()
+  (interactive)
+  (find-file "~/.zshrc"))
