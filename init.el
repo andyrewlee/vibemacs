@@ -164,6 +164,17 @@
   :hook ((prog-mode . diff-hl-mode)
          (magit-post-refresh . diff-hl-magit-post-refresh)))
 
+;;; solarized theme
+(use-package solarized-theme
+  :init
+  (setq solarized-use-variable-pitch nil
+        solarized-scale-org-headlines nil
+        solarized-scale-outline-headlines nil
+        solarized-use-less-bold t
+        solarized-emphasize-indicators nil)
+  :config
+  (load-theme 'solarized-light :no-confirm))
+
 ;;; functions
 ;; horizontal split and focus
 (defun vibemacs/split-window-below-and-switch ()
