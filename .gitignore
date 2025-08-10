@@ -4,3 +4,5 @@ transient/
 custom.el
 projects
 libtree-*
+var/
+*~

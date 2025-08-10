@@ -1,13 +1,18 @@
-;; package manager
+;;; package manager
 (require 'package)
-
-;; package archive
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-
-;; load installed packages
 (package-initialize)
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+(require 'use-package)
+(setq use-package-always-ensure t)
 
-;; gui config
+;;; keep custom out of init.el
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file) (load custom-file))
+
+;;; defaults
 (when (fboundp 'menu-bar-mode)   (menu-bar-mode -1))
 (when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
 (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
@@ -18,22 +23,10 @@
       inhibit-startup-screen t
       require-final-newline t)
 (load-theme 'modus-vivendi :no-confirm)
+(setq-default indent-tabs-mode nil tab-width 2)
+(save-place-mode 1)
 
-;; helper language for installing and configuring packages
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(require 'use-package)
-
-;; always auto-install packages if missing
-(setq use-package-always-ensure t)
-
-;; keep customize output out of init.el
-(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-(when (file-exists-p custom-file)
-  (load custom-file))
-
-;; vim keybindings for emacs
+;;; vim
 (use-package evil
   :init
   (setq evil-want-C-u-scroll t    
@@ -42,16 +35,14 @@
   :config
   ;; enable globally
   (evil-mode 1))
-;; better evil integration with many emacs modes
 (use-package evil-collection
   :after evil
   :config
   (evil-collection-init))
-;; comment
 (use-package evil-nerd-commenter
   :after evil)
 
-;; show popup of available keys after prefix is pressed
+;;; available keys after prefix is pressed
 (use-package which-key
   :init
   (setq which-key-separator " "
@@ -59,7 +50,7 @@
   :config
   (which-key-mode 1))
 
-;; define keymaps with SPC as global leader
+;;; keymaps with SPC as global leader
 (use-package general
   :after evil
   :config
@@ -89,6 +80,7 @@
   ;; git
   "gg" '(magit-status   :which-key "status")
   "g." '(magit-dispatch :which-key "menu")
+  "gd" '(magit-diff :which-key "git diff")
   "gl" '(magit-log-buffer-file :which-key "history of file")
   "gL" '(magit-log-all         :which-key "history of repo")
   "gb" '(magit-branch-checkout :which-key "checkout branch")
@@ -108,7 +100,7 @@
   "bp"  '(previous-buffer :which-key "previous buffer")
   "bm"  '(buffer-menu :which-key "list buffers"))
 
-;; typescript
+;;; typescript
 ;; npm i -g typescript typescript-language-server
 ;; npm i -g prettier eslint_d
 ;; syntax
@@ -159,7 +151,7 @@
 (use-package marginalia :init (marginalia-mode 1))
 (use-package consult)
 
-;; git
+;;; git
 (use-package magit
   :commands (magit-status magit-dispatch)
   :init
@@ -170,19 +162,17 @@
   :hook ((prog-mode . diff-hl-mode)
          (magit-post-refresh . diff-hl-magit-post-refresh)))
 
-
+;;; functions
 ;; horizontal split and focus
 (defun vibemacs/split-window-below-and-switch ()
   (interactive)
   (split-window-below)
   (other-window 1))
-
 ;; vertical split and focus
 (defun vibemacs/split-window-right-and-switch ()
   (interactive)
   (split-window-right)
   (other-window 1))
-
 ;; emacs config
 (defun vibemacs/emacs-config ()
   (interactive)
