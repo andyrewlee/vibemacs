@@ -7,6 +7,7 @@
   (package-refresh-contents)
   (package-install 'use-package))
 (require 'use-package)
+(require 'project)
 (setq use-package-always-ensure t)
 
 ;;; keep custom out of init.el
@@ -86,7 +87,10 @@
   "lR"   '(xref-find-references                :which-key "find references")
   "lf"   '(apheleia-format-buffer              :which-key "format buffer")
   ;; terminal
-  "at"   '(vibemacs/open-vterm                  :which-key "vterm")
+  "aa"   '(multi-vterm                           :which-key "new codex term")
+  "an"   '(multi-vterm-next                     :which-key "next codex term")
+  "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
+  "at"   '(vibemacs/open-vterm                  :which-key "attach codex")
   ;; git
   "g."   '(magit-dispatch                      :which-key "menu")
   "gs"   '(magit-status                        :which-key "status")
@@ -205,6 +209,12 @@
   :init
   (setq vterm-shell (or (getenv "SHELL") "/bin/zsh")))
 
+(use-package multi-vterm
+  :after vterm
+  :commands (multi-vterm multi-vterm-next multi-vterm-prev)
+  :init
+  (setq multi-vterm-buffer-name "codex"))
+
 ;;; prose polish
 (use-package visual-fill-column
   :commands (visual-fill-column-mode))
@@ -214,19 +224,36 @@
          (markdown-ts-mode . mixed-pitch-mode)))
 
 ;;; functions
-;; launch vterm, fallback to ansi-term if module missing; default opens new session
+;; helper to derive project root/name for buffer naming
+(defun vibemacs--project-root-and-name ()
+  (when-let* ((project (project-current nil))
+              (root (project-root project))
+              (name (file-name-nondirectory (directory-file-name root))))
+    (list (expand-file-name root) name)))
+
+;; launch vterm rooted at project, fallback to ansi-term; C-u reuses existing buffer
 (defun vibemacs/open-vterm (&optional reuse)
-  "Open a vterm buffer, creating a new session by default.
-With prefix REUSE, reuse the canonical `*vterm*' buffer instead."
+  "Open a vterm buffer rooted at the current project.
+With prefix REUSE, reuse the most recent Codex buffer instead of creating a new one."
   (interactive "P")
-  (if (fboundp 'vterm)
-      (let ((current-prefix-arg (unless reuse '(4))))
-        (condition-case err
-            (call-interactively #'vterm)
-          (error
-           (message "vterm unavailable (%s); using ansi-term" (error-message-string err))
-           (ansi-term (or (getenv "SHELL") "/bin/sh")))))
-    (ansi-term (or (getenv "SHELL") "/bin/sh"))))
+  (let* ((project-info (vibemacs--project-root-and-name))
+         (project-root (car project-info))
+         (project-name (cadr project-info))
+         (default-directory (or project-root default-directory))
+         (buffer-prefix (if project-name
+                            (format "*codex:%s" project-name)
+                          "*codex")))
+    (if (fboundp 'vterm)
+        (let ((current-prefix-arg (unless reuse '(4))))
+          (condition-case err
+              (progn
+                (call-interactively #'vterm)
+                (when (not reuse)
+                  (rename-buffer (generate-new-buffer-name (concat buffer-prefix "*")) t)))
+            (error
+             (message "vterm unavailable (%s); using ansi-term" (error-message-string err))
+             (ansi-term (or (getenv "SHELL") "/bin/sh")))))
+      (ansi-term (or (getenv "SHELL") "/bin/sh")))))
 ;; horizontal split and focus
 (defun vibemacs/horizontal-split ()
   (interactive)
