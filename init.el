@@ -1,4 +1,5 @@
 ;;; package manager
+(setq package-enable-at-startup nil)
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
@@ -18,14 +19,18 @@
 (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
 (blink-cursor-mode -1)
 (global-display-line-numbers-mode 1)
-(pixel-scroll-precision-mode 1)
+(when (fboundp 'pixel-scroll-precision-mode)
+  (pixel-scroll-precision-mode 1))
 (setq ring-bell-function 'ignore
       inhibit-startup-screen t
-      require-final-newline t)
-(load-theme 'modus-vivendi :no-confirm)
+      require-final-newline t
+      use-short-answers t)
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
 (add-hook 'before-save-hook 'delete-trailing-whitespace)
+(setq global-auto-revert-non-file-buffers t
+      auto-revert-verbose nil)
+(global-auto-revert-mode 1)
 
 ;;; vim
 (use-package evil
@@ -57,7 +62,7 @@
   :config
   (general-evil-setup t)
   (general-create-definer vibemacs/leader
-    :states '(normal visual insert emacs)
+    :states '(normal insert visual motion emacs)
     :keymaps 'override
     :prefix "SPC"
     :global-prefix "M-SPC"))
@@ -81,7 +86,7 @@
   "lR"   '(xref-find-references                :which-key "find references")
   "lf"   '(apheleia-format-buffer              :which-key "format buffer")
   ;; terminal
-  "at"   '(vibemacs/open-ansi-term              :which-key "ansi-term")
+  "at"   '(vibemacs/open-vterm                  :which-key "vterm")
   ;; git
   "g."   '(magit-dispatch                      :which-key "menu")
   "gs"   '(magit-status                        :which-key "status")
@@ -158,9 +163,22 @@
 (use-package marginalia :init (marginalia-mode 1))
 (use-package consult)
 
+;;; markdown
+(use-package markdown-mode
+  :mode ("README\\.md\\'" . gfm-mode)
+  :init
+  (setq markdown-fontify-code-blocks-natively t
+        markdown-fontify-whole-heading-line t)
+  :hook ((markdown-mode . vibemacs/markdown-setup)
+         (markdown-mode . vibemacs/markdown-visual-fill)
+         (markdown-ts-mode . vibemacs/markdown-setup)
+         (markdown-ts-mode . vibemacs/markdown-visual-fill)))
+
 ;;; git
 (use-package magit
-  :commands (magit-status magit-dispatch)
+  :commands (magit-status magit-dispatch magit-diff magit-commit
+             magit-log-buffer-file magit-log-all magit-branch-checkout
+             magit-branch-create magit-push magit-pull magit-rebase)
   :init
   (setq magit-display-buffer-function
         #'magit-display-buffer-same-window-except-diff-v1))
@@ -178,13 +196,37 @@
         solarized-use-less-bold t
         solarized-emphasize-indicators nil)
   :config
+  (mapc #'disable-theme custom-enabled-themes)
   (load-theme 'solarized-light :no-confirm))
 
+;;; terminal
+(use-package vterm
+  :commands (vterm)
+  :init
+  (setq vterm-shell (or (getenv "SHELL") "/bin/zsh")))
+
+;;; prose polish
+(use-package visual-fill-column
+  :commands (visual-fill-column-mode))
+
+(use-package mixed-pitch
+  :hook ((markdown-mode . mixed-pitch-mode)
+         (markdown-ts-mode . mixed-pitch-mode)))
+
 ;;; functions
-;; Launch ansi-term with user's shell
-(defun vibemacs/open-ansi-term ()
-  (interactive)
-  (ansi-term (or (getenv "SHELL") "/bin/sh")))
+;; launch vterm, fallback to ansi-term if module missing; default opens new session
+(defun vibemacs/open-vterm (&optional reuse)
+  "Open a vterm buffer, creating a new session by default.
+With prefix REUSE, reuse the canonical `*vterm*' buffer instead."
+  (interactive "P")
+  (if (fboundp 'vterm)
+      (let ((current-prefix-arg (unless reuse '(4))))
+        (condition-case err
+            (call-interactively #'vterm)
+          (error
+           (message "vterm unavailable (%s); using ansi-term" (error-message-string err))
+           (ansi-term (or (getenv "SHELL") "/bin/sh")))))
+    (ansi-term (or (getenv "SHELL") "/bin/sh"))))
 ;; horizontal split and focus
 (defun vibemacs/horizontal-split ()
   (interactive)
@@ -203,3 +245,14 @@
 (defun vibemacs/zsh-config ()
   (interactive)
   (find-file "~/.zshrc"))
+
+;; markdown polish
+(defun vibemacs/markdown-setup ()
+  (display-line-numbers-mode -1)
+  (visual-line-mode 1)
+  (setq-local line-spacing 0.2))
+
+(defun vibemacs/markdown-visual-fill ()
+  (setq visual-fill-column-width 100
+        visual-fill-column-center-text t)
+  (visual-fill-column-mode 1))
