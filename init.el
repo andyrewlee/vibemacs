@@ -80,28 +80,6 @@
   "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
   "lR"   '(xref-find-references                :which-key "find references")
   "lf"   '(apheleia-format-buffer              :which-key "format buffer")
-  ;; ai
-  "acm"  '(claude-code-transient               :which-key "menu")
-  "acc"  '(claude-code                         :which-key "start")
-  "acC"  '(claude-code-continue                :which-key "continue")
-  "acr"  '(claude-code-resume                  :which-key "resume session")
-  "acd"  '(claude-code-start-in-directory      :which-key "start in dir")
-  "acs"  '(claude-code-send-command            :which-key "send cmd")
-  "acx"  '(claude-code-send-command-with-context :which-key "send cmd+ctx")
-  "acR"  '(claude-code-send-region             :which-key "send region")
-  "ace"  '(claude-code-fix-error-at-point      :which-key "fix error")
-  "aco"  '(claude-code-send-buffer-file        :which-key "send file")
-  "act"  '(claude-code-toggle                  :which-key "toggle window")
-  "acb"  '(claude-code-switch-to-buffer        :which-key "switch buf")
-  "acB"  '(claude-code-select-buffer           :which-key "select buf")
-  "ack"  '(claude-code-kill                    :which-key "kill")
-  "acK"  '(claude-code-kill-all                :which-key "kill all")
-  "agg"  '(gptel                               :which-key "chat buffer")
-  "ags"  '(gptel-send                          :which-key "send region")
-  "agr"  '(gptel-rewrite                       :which-key "rewrite region")
-  "agm"  '(gptel-menu                          :which-key "menu")
-  "agac" '(gptel-add                           :which-key "add/remove context")
-  "agaf" '(gptel-add-file                      :which-key "add file to context")
   ;; git
   "g."   '(magit-dispatch                      :which-key "menu")
   "gs"   '(magit-status                        :which-key "status")
@@ -200,36 +178,11 @@
   :config
   (load-theme 'solarized-light :no-confirm))
 
-;;; claude code
-;; npm install -g @anthropic-ai/claude-code
-;; eat terminal backend
-(use-package eat :ensure t)
-;; vterm terminal backend
-(use-package vterm :ensure t)
-;; install claude-code.el
-(use-package claude-code :ensure t
-  :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-  :config
-  (claude-code-mode)
-  :bind
-  (:repeat-map my-claude-code-map ("M" . claude-code-cycle-mode)))
-
-;;; gptel
-;; export OPENAI_API_KEY="sk-proj-XXX" to .zshrc
-;; used to read env from emacs
-(use-package exec-path-from-shell
-  :if (memq window-system '(mac ns x))
-  :init
-  (setq exec-path-from-shell-variables '("PATH" "OPENAI_API_KEY"))
-  :config
-  (exec-path-from-shell-initialize))
-(use-package gptel
-  :after exec-path-from-shell
-  :init
-  (setq gptel-api-key (getenv "OPENAI_API_KEY"))
-  :commands (gptel gptel-send gptel-menu))
-
 ;;; functions
+;; Launch ansi-term with user's shell
+(defun vibemacs/open-ansi-term ()
+  (interactive)
+  (ansi-term (or (getenv "SHELL") "/bin/sh")))
 ;; horizontal split and focus
 (defun vibemacs/horizontal-split ()
   (interactive)
