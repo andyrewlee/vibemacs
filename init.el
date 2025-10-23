@@ -80,6 +80,8 @@
   "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
   "lR"   '(xref-find-references                :which-key "find references")
   "lf"   '(apheleia-format-buffer              :which-key "format buffer")
+  ;; terminal
+  "at"   '(vibemacs/open-ansi-term              :which-key "ansi-term")
   ;; git
   "g."   '(magit-dispatch                      :which-key "menu")
   "gs"   '(magit-status                        :which-key "status")
