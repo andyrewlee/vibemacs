@@ -8,7 +8,34 @@
   (package-install 'use-package))
 (require 'use-package)
 (require 'project)
-(setq use-package-always-ensure t)
+
+(defvar vibemacs--package-refreshed nil
+  "Whether package archives have been refreshed during this session.")
+
+(defun vibemacs/use-package-ensure (name _args &rest _)
+  "Ensure NAME is installed, refreshing package archives once on failure.
+Returns non-nil on success, nil on failure."
+  (if (package-installed-p name)
+      t
+    (let ((refreshed nil))
+      (catch 'done
+        (while t
+          (condition-case err
+              (progn
+                (package-install name)
+                (throw 'done t))
+            (error
+             (if (or refreshed vibemacs--package-refreshed)
+                 (progn
+                   (message "Failed to install %s: %s" name (error-message-string err))
+                   (throw 'done nil))
+               (setq refreshed t
+                     vibemacs--package-refreshed t)
+               (message "Refreshing package archives…")
+               (package-refresh-contents)))))))))
+
+(setq use-package-ensure-function #'vibemacs/use-package-ensure
+      use-package-always-ensure t)
 
 ;;; keep custom out of init.el
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
@@ -87,10 +114,10 @@
   "lR"   '(xref-find-references                :which-key "find references")
   "lf"   '(apheleia-format-buffer              :which-key "format buffer")
   ;; terminal
-  "aa"   '(multi-vterm                           :which-key "new codex term")
+  "at"   '(multi-vterm                           :which-key "new codex term")
   "an"   '(multi-vterm-next                     :which-key "next codex term")
   "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
-  "at"   '(vibemacs/open-vterm                  :which-key "attach codex")
+  "av"   '(vibemacs/vterm-toggle-copy-mode      :which-key "copy mode help")
   ;; git
   "g."   '(magit-dispatch                      :which-key "menu")
   "gs"   '(magit-status                        :which-key "status")
@@ -223,37 +250,18 @@
   :hook ((markdown-mode . mixed-pitch-mode)
          (markdown-ts-mode . mixed-pitch-mode)))
 
-;;; functions
-;; helper to derive project root/name for buffer naming
-(defun vibemacs--project-root-and-name ()
-  (when-let* ((project (project-current nil))
-              (root (project-root project))
-              (name (file-name-nondirectory (directory-file-name root))))
-    (list (expand-file-name root) name)))
+(defun vibemacs/vterm-toggle-copy-mode ()
+  "Toggle `vterm-copy-mode' and display a short cheat sheet when enabled."
+  (interactive)
+  (if (derived-mode-p 'vterm-mode)
+      (if (bound-and-true-p vterm-copy-mode)
+          (progn
+            (vterm-copy-mode 0)
+            (message "vterm copy mode disabled"))
+        (vterm-copy-mode 1)
+        (message "vterm copy mode: PgUp/PgDn scroll, q exit, y yank"))
+    (message "Not in a vterm buffer")))
 
-;; launch vterm rooted at project, fallback to ansi-term; C-u reuses existing buffer
-(defun vibemacs/open-vterm (&optional reuse)
-  "Open a vterm buffer rooted at the current project.
-With prefix REUSE, reuse the most recent Codex buffer instead of creating a new one."
-  (interactive "P")
-  (let* ((project-info (vibemacs--project-root-and-name))
-         (project-root (car project-info))
-         (project-name (cadr project-info))
-         (default-directory (or project-root default-directory))
-         (buffer-prefix (if project-name
-                            (format "*codex:%s" project-name)
-                          "*codex")))
-    (if (fboundp 'vterm)
-        (let ((current-prefix-arg (unless reuse '(4))))
-          (condition-case err
-              (progn
-                (call-interactively #'vterm)
-                (when (not reuse)
-                  (rename-buffer (generate-new-buffer-name (concat buffer-prefix "*")) t)))
-            (error
-             (message "vterm unavailable (%s); using ansi-term" (error-message-string err))
-             (ansi-term (or (getenv "SHELL") "/bin/sh")))))
-      (ansi-term (or (getenv "SHELL") "/bin/sh")))))
 ;; horizontal split and focus
 (defun vibemacs/horizontal-split ()
   (interactive)
