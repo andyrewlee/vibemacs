@@ -153,7 +153,8 @@ Signals an error if the command exits with non-zero."
 (defun vibemacs-worktrees--load-registry ()
   "Return list of worktree structs from the registry file."
   (when (file-readable-p vibemacs-worktrees-registry)
-    (let ((json-object-type 'plist))
+    (let ((json-object-type 'plist)
+          (json-array-type 'list))
       (mapcar (lambda (entry)
                 (vibemacs-worktrees--entry-create
                  :name (plist-get entry :name)
@@ -234,20 +235,28 @@ Signals an error if the command exits with non-zero."
   (let ((path (vibemacs-worktrees--metadata-path entry)))
     (if (file-readable-p path)
         (let ((json-object-type 'alist)
-              (json-array-type 'list))
+              (json-array-type 'list)
+              (json-key-type 'symbol))
           (json-read-file path))
       (vibemacs-worktrees--default-metadata entry))))
 
 (defun vibemacs-worktrees--ensure-port-base (entry metadata)
   "Ensure METADATA for ENTRY contains a port-base value and return it."
-  (or (alist-get 'port-base metadata)
+  (let ((existing (alist-get 'port-base metadata)))
+    (if existing
+        (progn
+          (setq vibemacs-worktrees--port-counter
+                (max (or vibemacs-worktrees--port-counter
+                         vibemacs-worktrees-port-start)
+                     (+ existing vibemacs-worktrees-port-range-size)))
+          existing)
       (let ((base (or vibemacs-worktrees--port-counter
                       vibemacs-worktrees-port-start)))
         (setq vibemacs-worktrees--port-counter
               (+ base vibemacs-worktrees-port-range-size))
         (setf (alist-get 'port-base metadata) base)
         (vibemacs-worktrees--save-metadata entry metadata)
-        base)))
+        base))))
 
 (defun vibemacs-worktrees--scripts (metadata)
   "Return the scripts alist from METADATA."
@@ -261,7 +270,7 @@ Signals an error if the command exits with non-zero."
       (with-temp-buffer
         (insert diff)
         (goto-char (point-min))
-        (while (re-search-forward "^diff --git a/\(.+\) b/\(.+\)$" nil t)
+        (while (re-search-forward "^diff --git a/\\(.+\\) b/\\(.+\\)$" nil t)
           (push (match-string 2) files)))
       (delete-dups (nreverse files)))))
 
@@ -408,24 +417,25 @@ If ENTRY is nil prompt the user."
         (insert (format "# %s (%s)\n\n" (upcase (symbol-name kind)) root)))
       (let* ((process-environment (append env-vars process-environment))
              (command-list (list shell-file-name shell-command-switch command))
-             (proc (make-process
-                    :name process-name
-                    :buffer buffer
-                    :command command-list
-                    :noquery t
-                    :sentinel (lambda (process event)
-                                (when (memq (process-status process) '(exit signal))
-                                  (remhash root vibemacs-worktrees--processes)
-                                  (with-current-buffer buffer
-                                    (let ((inhibit-read-only t))
-                                      (goto-char (point-max))
-                                      (insert (format "\n[%s] %s"
-                                                      (format-time-string "%F %T")
-                                                      (string-trim-right event)))))
-                                  (message "Worktree %s %s finished: %s"
-                                           (vibemacs-worktrees--entry-name entry)
-                                           (symbol-name kind)
-                                           (string-trim event)))))))
+             (proc (let ((default-directory root))
+                     (make-process
+                      :name process-name
+                      :buffer buffer
+                      :command command-list
+                      :noquery t
+                      :sentinel (lambda (process event)
+                                  (when (memq (process-status process) '(exit signal))
+                                    (remhash root vibemacs-worktrees--processes)
+                                    (with-current-buffer buffer
+                                      (let ((inhibit-read-only t))
+                                        (goto-char (point-max))
+                                        (insert (format "\n[%s] %s"
+                                                        (format-time-string "%F %T")
+                                                        (string-trim-right event)))))
+                                    (message "Worktree %s %s finished: %s"
+                                             (vibemacs-worktrees--entry-name entry)
+                                             (symbol-name kind)
+                                             (string-trim event))))))))
         (puthash root proc vibemacs-worktrees--processes)
         (display-buffer buffer '(display-buffer-below-selected))
         (message "Running %s script for %s" kind (vibemacs-worktrees--entry-name entry))))))
@@ -658,7 +668,8 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
         (`((response . ,response)
            (diff . ,diff)
            . ,rest)
-         (list :response response :diff diff :rest rest))
+         (let ((normalized-diff (if (eq diff json-null) nil diff)))
+           (list :response response :diff normalized-diff :rest rest)))
         (other
          (error "Unexpected Codex output: %s" other))))))
 
