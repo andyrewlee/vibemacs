@@ -9,7 +9,12 @@
 (require 'use-package)
 (require 'project)
 (add-to-list 'load-path (expand-file-name "etc" user-emacs-directory))
-(require 'worktrees)
+(condition-case err
+    (progn
+      (require 'worktrees)
+      (add-hook 'emacs-startup-hook #'vibemacs-worktrees-launch-home))
+  (error
+   (message "Vibemacs: failed to load worktrees (%s)" (error-message-string err))))
 
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")
@@ -95,56 +100,56 @@ Returns non-nil on success, nil on failure."
     :states '(normal insert visual motion emacs)
     :keymaps 'override
     :prefix "SPC"
-    :global-prefix "M-SPC"))
-(vibemacs-leader
-  "SPC"  '(execute-extended-command            :which-key "M-x")
-  "TAB"  '(mode-line-other-buffer              :which-key "previous buffer")
-  ;; emacs
-  "ec"   '(vibemacs-emacs-config               :which-key "emacs config")
-  ;; zsh
-  "zc"   '(vibemacs-zsh-config                 :which-key "zsh config")
-  ;; toggle
-  "tl"   '(display-line-numbers-mode           :which-key "toggle line number")
-  ;; comment
-  "c"    '(evilnc-comment-or-uncomment-lines   :which-key "comment")
-  ;; search
-  "sb"   '(consult-line                        :which-key "search in buffer")
-  "sp"   '(consult-ripgrep                     :which-key "search in project")
-  ;; language
-  "ld"   '(xref-find-definitions               :which-key "go to def")
-  "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
-  "lR"   '(xref-find-references                :which-key "find references")
-  "lf"   '(apheleia-format-buffer              :which-key "format buffer")
-  ;; terminal
-  "at"   '(multi-vterm                           :which-key "new codex term")
-  "an"   '(multi-vterm-next                     :which-key "next codex term")
-  "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
-  "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
-  "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
-  ;; git
-  "g."   '(magit-dispatch                      :which-key "menu")
-  "gs"   '(magit-status                        :which-key "status")
-  "gd"   '(magit-diff                          :which-key "git diff")
-  "gc"   '(magit-commit                        :which-key "git commit")
-  "gl"   '(magit-log-buffer-file               :which-key "history of file")
-  "gL"   '(magit-log-all                       :which-key "history of repo")
-  "gb"   '(magit-branch-checkout               :which-key "checkout branch")
-  "gB"   '(magit-branch-create                 :which-key "create branch")
-  "gP"   '(magit-push                          :which-key "push")
-  "gF"   '(magit-pull                          :which-key "pull")
-  "gR"   '(magit-rebase                        :which-key "rebase")
-  ;; window
-  "wS"   '(vibemacs-horizontal-split           :which-key "horizontal split")
-  "wV"   '(vibemacs-vertical-split             :which-key "vertical split")
-  "wk"   '(windmove-up                         :which-key "move to top window")
-  "wl"   '(windmove-right                      :which-key "move to right rindow")
-  "wh"   '(windmove-left                       :which-key "move to left window")
-  "wj"   '(windmove-down                       :which-key "move to bottom window")
-  ;; buffer
-  "be"   '(eval-buffer                         :which-key "eval buffer")
-  "bn"   '(next-buffer                         :which-key "next buffer")
-  "bp"   '(previous-buffer                     :which-key "previous buffer")
-  "bm"   '(buffer-menu                         :which-key "list buffers"))
+    :global-prefix "M-SPC")
+  (vibemacs-leader
+    "SPC"  '(execute-extended-command            :which-key "M-x")
+    "TAB"  '(mode-line-other-buffer              :which-key "previous buffer")
+    ;; emacs
+    "ec"   '(vibemacs-emacs-config               :which-key "emacs config")
+    ;; zsh
+    "zc"   '(vibemacs-zsh-config                 :which-key "zsh config")
+    ;; toggle
+    "tl"   '(display-line-numbers-mode           :which-key "toggle line number")
+    ;; comment
+    "c"    '(evilnc-comment-or-uncomment-lines   :which-key "comment")
+    ;; search
+    "sb"   '(consult-line                        :which-key "search in buffer")
+    "sp"   '(consult-ripgrep                     :which-key "search in project")
+    ;; language
+    "ld"   '(xref-find-definitions               :which-key "go to def")
+    "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
+    "lR"   '(xref-find-references                :which-key "find references")
+    "lf"   '(apheleia-format-buffer              :which-key "format buffer")
+    ;; terminal
+    "at"   '(multi-vterm                           :which-key "new codex term")
+    "an"   '(multi-vterm-next                     :which-key "next codex term")
+    "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
+    "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
+    "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
+    ;; git
+    "g."   '(magit-dispatch                      :which-key "menu")
+    "gs"   '(magit-status                        :which-key "status")
+    "gd"   '(magit-diff                          :which-key "git diff")
+    "gc"   '(magit-commit                        :which-key "git commit")
+    "gl"   '(magit-log-buffer-file               :which-key "history of file")
+    "gL"   '(magit-log-all                       :which-key "history of repo")
+    "gb"   '(magit-branch-checkout               :which-key "checkout branch")
+    "gB"   '(magit-branch-create                 :which-key "create branch")
+    "gP"   '(magit-push                          :which-key "push")
+    "gF"   '(magit-pull                          :which-key "pull")
+    "gR"   '(magit-rebase                        :which-key "rebase")
+    ;; window
+    "wS"   '(vibemacs-horizontal-split           :which-key "horizontal split")
+    "wV"   '(vibemacs-vertical-split             :which-key "vertical split")
+    "wk"   '(windmove-up                         :which-key "move to top window")
+    "wl"   '(windmove-right                      :which-key "move to right rindow")
+    "wh"   '(windmove-left                       :which-key "move to left window")
+    "wj"   '(windmove-down                       :which-key "move to bottom window")
+    ;; buffer
+    "be"   '(eval-buffer                         :which-key "eval buffer")
+    "bn"   '(next-buffer                         :which-key "next buffer")
+    "bp"   '(previous-buffer                     :which-key "previous buffer")
+    "bm"   '(buffer-menu                         :which-key "list buffers")))
 
 ;;; typescript
 ;; npm i -g typescript typescript-language-server
