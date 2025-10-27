@@ -7,3 +7,5 @@ libtree-*
 var/
 *~
 places
+worktrees.json
+worktrees-metadata/
