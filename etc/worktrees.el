@@ -903,10 +903,27 @@ If ENTRY is nil prompt the user."
                 (copy-file env-source env-target t)
                 (message "Copied .env.local → %s" (abbreviate-file-name env-target)))
             (error (message "Failed to copy .env.local: %s" (error-message-string err)))))
-        (when vibemacs-worktrees-open-terminal-on-create
-          (vibemacs-worktrees-open-terminal entry)))
-      (dired target-path)
-      (message "Worktree %s ready at %s" name target-path))))
+        (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
+                                  vibemacs-worktrees--center-window)))
+          (vibemacs-worktrees-dashboard--activate entry)
+          (vibemacs-worktrees--files-refresh entry nil)
+          (vibemacs-worktrees-center-show-chat entry)
+          (if (and center-window (window-live-p center-window))
+              (progn
+                (when vibemacs-worktrees-open-terminal-on-create
+                  (let ((original-window (selected-window)))
+                    (vibemacs-worktrees-center-show-terminal entry)
+                    (vibemacs-worktrees-center-show-chat entry)
+                    (when (window-live-p original-window)
+                      (select-window original-window))))
+                (when (window-live-p vibemacs-worktrees--center-window)
+                  (select-window vibemacs-worktrees--center-window)))
+            (when vibemacs-worktrees-open-terminal-on-create
+              (vibemacs-worktrees-open-terminal entry))
+            (when (file-directory-p target-path)
+              (dired target-path))))
+        (message "Worktree %s ready at %s" name target-path)
+        entry))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-archive (entry)
