@@ -7,3 +7,6 @@ libtree-*
 var/
 *~
 places
+worktrees.json
+worktrees-metadata/
+eln-cache/

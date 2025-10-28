@@ -8,11 +8,18 @@
   (package-install 'use-package))
 (require 'use-package)
 (require 'project)
+(add-to-list 'load-path (expand-file-name "etc" user-emacs-directory))
+(condition-case err
+    (progn
+      (require 'worktrees)
+      (add-hook 'emacs-startup-hook #'vibemacs-worktrees-launch-home))
+  (error
+   (message "Vibemacs: failed to load worktrees (%s)" (error-message-string err))))
 
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")
 
-(defun vibemacs/use-package-ensure (name _args &rest _)
+(defun vibemacs-use-package-ensure (name _args &rest _)
   "Ensure NAME is installed, refreshing package archives once on failure.
 Returns non-nil on success, nil on failure."
   (if (package-installed-p name)
@@ -34,7 +41,7 @@ Returns non-nil on success, nil on failure."
                (message "Refreshing package archives…")
                (package-refresh-contents)))))))))
 
-(setq use-package-ensure-function #'vibemacs/use-package-ensure
+(setq use-package-ensure-function #'vibemacs-use-package-ensure
       use-package-always-ensure t)
 
 ;;; keep custom out of init.el
@@ -89,59 +96,60 @@ Returns non-nil on success, nil on failure."
   :after evil
   :config
   (general-evil-setup t)
-  (general-create-definer vibemacs/leader
+  (general-create-definer vibemacs-leader
     :states '(normal insert visual motion emacs)
     :keymaps 'override
     :prefix "SPC"
-    :global-prefix "M-SPC"))
-(vibemacs/leader
-  "SPC"  '(execute-extended-command            :which-key "M-x")
-  "TAB"  '(mode-line-other-buffer              :which-key "previous buffer")
-  ;; emacs
-  "ec"   '(vibemacs/emacs-config               :which-key "emacs config")
-  ;; zsh
-  "zc"   '(vibemacs/zsh-config                 :which-key "zsh config")
-  ;; toggle
-  "tl"   '(display-line-numbers-mode           :which-key "toggle line number")
-  ;; comment
-  "c"    '(evilnc-comment-or-uncomment-lines   :which-key "comment")
-  ;; search
-  "sb"   '(consult-line                        :which-key "search in buffer")
-  "sp"   '(consult-ripgrep                     :which-key "search in project")
-  ;; language
-  "ld"   '(xref-find-definitions               :which-key "go to def")
-  "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
-  "lR"   '(xref-find-references                :which-key "find references")
-  "lf"   '(apheleia-format-buffer              :which-key "format buffer")
-  ;; terminal
-  "at"   '(multi-vterm                           :which-key "new codex term")
-  "an"   '(multi-vterm-next                     :which-key "next codex term")
-  "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
-  "av"   '(vibemacs/vterm-toggle-copy-mode      :which-key "copy mode help")
-  ;; git
-  "g."   '(magit-dispatch                      :which-key "menu")
-  "gs"   '(magit-status                        :which-key "status")
-  "gd"   '(magit-diff                          :which-key "git diff")
-  "gc"   '(magit-commit                        :which-key "git commit")
-  "gl"   '(magit-log-buffer-file               :which-key "history of file")
-  "gL"   '(magit-log-all                       :which-key "history of repo")
-  "gb"   '(magit-branch-checkout               :which-key "checkout branch")
-  "gB"   '(magit-branch-create                 :which-key "create branch")
-  "gP"   '(magit-push                          :which-key "push")
-  "gF"   '(magit-pull                          :which-key "pull")
-  "gR"   '(magit-rebase                        :which-key "rebase")
-  ;; window
-  "wS"   '(vibemacs/horizontal-split           :which-key "horizontal split")
-  "wV"   '(vibemacs/vertical-split             :which-key "vertical split")
-  "wk"   '(windmove-up                         :which-key "move to top window")
-  "wl"   '(windmove-right                      :which-key "move to right rindow")
-  "wh"   '(windmove-left                       :which-key "move to left window")
-  "wj"   '(windmove-down                       :which-key "move to bottom window")
-  ;; buffer
-  "be"   '(eval-buffer                         :which-key "eval buffer")
-  "bn"   '(next-buffer                         :which-key "next buffer")
-  "bp"   '(previous-buffer                     :which-key "previous buffer")
-  "bm"   '(buffer-menu                         :which-key "list buffers"))
+    :global-prefix "M-SPC")
+  (vibemacs-leader
+    "SPC"  '(execute-extended-command            :which-key "M-x")
+    "TAB"  '(mode-line-other-buffer              :which-key "previous buffer")
+    ;; emacs
+    "ec"   '(vibemacs-emacs-config               :which-key "emacs config")
+    ;; zsh
+    "zc"   '(vibemacs-zsh-config                 :which-key "zsh config")
+    ;; toggle
+    "tl"   '(display-line-numbers-mode           :which-key "toggle line number")
+    ;; comment
+    "c"    '(evilnc-comment-or-uncomment-lines   :which-key "comment")
+    ;; search
+    "sb"   '(consult-line                        :which-key "search in buffer")
+    "sp"   '(consult-ripgrep                     :which-key "search in project")
+    ;; language
+    "ld"   '(xref-find-definitions               :which-key "go to def")
+    "lD"   '(xref-find-definitions-other-window  :which-key "def (other win)")
+    "lR"   '(xref-find-references                :which-key "find references")
+    "lf"   '(apheleia-format-buffer              :which-key "format buffer")
+    ;; terminal
+    "at"   '(multi-vterm                           :which-key "new codex term")
+    "an"   '(multi-vterm-next                     :which-key "next codex term")
+    "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
+    "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
+    "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
+    ;; git
+    "g."   '(magit-dispatch                      :which-key "menu")
+    "gs"   '(magit-status                        :which-key "status")
+    "gd"   '(magit-diff                          :which-key "git diff")
+    "gc"   '(magit-commit                        :which-key "git commit")
+    "gl"   '(magit-log-buffer-file               :which-key "history of file")
+    "gL"   '(magit-log-all                       :which-key "history of repo")
+    "gb"   '(magit-branch-checkout               :which-key "checkout branch")
+    "gB"   '(magit-branch-create                 :which-key "create branch")
+    "gP"   '(magit-push                          :which-key "push")
+    "gF"   '(magit-pull                          :which-key "pull")
+    "gR"   '(magit-rebase                        :which-key "rebase")
+    ;; window
+    "wS"   '(vibemacs-horizontal-split           :which-key "horizontal split")
+    "wV"   '(vibemacs-vertical-split             :which-key "vertical split")
+    "wk"   '(windmove-up                         :which-key "move to top window")
+    "wl"   '(windmove-right                      :which-key "move to right rindow")
+    "wh"   '(windmove-left                       :which-key "move to left window")
+    "wj"   '(windmove-down                       :which-key "move to bottom window")
+    ;; buffer
+    "be"   '(eval-buffer                         :which-key "eval buffer")
+    "bn"   '(next-buffer                         :which-key "next buffer")
+    "bp"   '(previous-buffer                     :which-key "previous buffer")
+    "bm"   '(buffer-menu                         :which-key "list buffers")))
 
 ;;; typescript
 ;; npm i -g typescript typescript-language-server
@@ -200,10 +208,10 @@ Returns non-nil on success, nil on failure."
   :init
   (setq markdown-fontify-code-blocks-natively t
         markdown-fontify-whole-heading-line t)
-  :hook ((markdown-mode . vibemacs/markdown-setup)
-         (markdown-mode . vibemacs/markdown-visual-fill)
-         (markdown-ts-mode . vibemacs/markdown-setup)
-         (markdown-ts-mode . vibemacs/markdown-visual-fill)))
+  :hook ((markdown-mode . vibemacs-markdown-setup)
+         (markdown-mode . vibemacs-markdown-visual-fill)
+         (markdown-ts-mode . vibemacs-markdown-setup)
+         (markdown-ts-mode . vibemacs-markdown-visual-fill)))
 
 ;;; git
 (use-package magit
@@ -250,7 +258,7 @@ Returns non-nil on success, nil on failure."
   :hook ((markdown-mode . mixed-pitch-mode)
          (markdown-ts-mode . mixed-pitch-mode)))
 
-(defun vibemacs/vterm-toggle-copy-mode ()
+(defun vibemacs-vterm-toggle-copy-mode ()
   "Toggle `vterm-copy-mode' and display a short cheat sheet when enabled."
   (interactive)
   (if (derived-mode-p 'vterm-mode)
@@ -263,31 +271,31 @@ Returns non-nil on success, nil on failure."
     (message "Not in a vterm buffer")))
 
 ;; horizontal split and focus
-(defun vibemacs/horizontal-split ()
+(defun vibemacs-horizontal-split ()
   (interactive)
   (split-window-below)
   (other-window 1))
 ;; vertical split and focus
-(defun vibemacs/vertical-split ()
+(defun vibemacs-vertical-split ()
   (interactive)
   (split-window-right)
   (other-window 1))
 ;; emacs config
-(defun vibemacs/emacs-config ()
+(defun vibemacs-emacs-config ()
   (interactive)
   (find-file "~/.emacs.d/init.el"))
 ;; zsh config
-(defun vibemacs/zsh-config ()
+(defun vibemacs-zsh-config ()
   (interactive)
   (find-file "~/.zshrc"))
 
 ;; markdown polish
-(defun vibemacs/markdown-setup ()
+(defun vibemacs-markdown-setup ()
   (display-line-numbers-mode -1)
   (visual-line-mode 1)
   (setq-local line-spacing 0.2))
 
-(defun vibemacs/markdown-visual-fill ()
+(defun vibemacs-markdown-visual-fill ()
   (setq visual-fill-column-width 100
         visual-fill-column-center-text t)
   (visual-fill-column-mode 1))
