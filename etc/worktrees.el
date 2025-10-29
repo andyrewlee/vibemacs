@@ -2142,7 +2142,8 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
       (if (and file (not (string-empty-p file)))
           (let ((buffer (vibemacs-worktrees-center--render-diff entry file)))
             (set-window-buffer vibemacs-worktrees--center-window buffer))
-        (let ((buffer (vibemacs-worktrees--files-refresh entry nil)))
+        (vibemacs-worktrees--files-refresh entry nil)
+        (let ((buffer (vibemacs-worktrees-center--render-diff entry nil)))
           (set-window-buffer vibemacs-worktrees--center-window buffer)))
       (force-mode-line-update t))))
 
