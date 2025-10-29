@@ -1,4 +1,4 @@
-;;; worktrees.el --- Vibemacs worktree helpers -*- lexical-binding: t; -*-
+;;; worktrees.el --- vibemacs worktree helpers -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'json)
@@ -32,7 +32,7 @@
 (defvar vibemacs-worktrees--activity-buffer-name "*Worktrees Activity*"
   "Name of the persistent activity log buffer.")
 
-(defvar vibemacs-worktrees-diff-buffer "*Vibemacs Diff*"
+(defvar vibemacs-worktrees-diff-buffer "*vibemacs Diff*"
   "Buffer name for the diff review pane.")
 
 (defvar vibemacs-worktrees-terminal-buffer-prefix "*worktree-%s-term*"
@@ -41,32 +41,11 @@
 (defvar vibemacs-worktrees--center-window nil
   "Window used for the central chat/terminal pane.")
 
-(defvar vibemacs-worktrees--left-dashboard-window nil
-  "Window displaying the worktree dashboard list.")
-
-(defvar vibemacs-worktrees--left-tree-window nil
-  "Window displaying the per-worktree file tree.")
-
-(defvar vibemacs-worktrees--right-files-window nil
-  "Window displaying the per-worktree changed files list.")
-
-(defvar vibemacs-worktrees--right-terminal-window nil
-  "Window displaying the per-worktree terminal buffer.")
-
 (defvar vibemacs-worktrees--transcript-buffers (make-hash-table :test 'equal)
   "Hash table mapping worktree roots to transcript buffers.")
 
-(defvar vibemacs-worktrees--file-tree-buffers (make-hash-table :test 'equal)
-  "Hash table mapping worktree roots to cached file tree buffers.")
-
-(defconst vibemacs-worktrees--file-tree-buffer-prefix "*Vibemacs File Tree %s*"
-  "Format string used for per-worktree file tree buffers.")
-
-(defconst vibemacs-worktrees--changed-files-buffer-name "*Vibemacs Changed Files*"
-  "Buffer used to list changed files for the active worktree.")
-
 (defvar vibemacs-worktrees--startup-applied nil
-  "Whether the Vibemacs startup layout has already been applied this session.")
+  "Whether the vibemacs startup layout has already been applied this session.")
 
 (defvar vibemacs-worktrees--active-root nil
   "Root path of the worktree currently focused in the center pane.")
@@ -96,7 +75,7 @@
   "Tooltip displayed when hovering dashboard worktree rows.")
 
 (defvar-local vibemacs-worktrees--chat-command-started nil
-  "Non-nil when the Vibemacs chat console has already launched Codex.")
+  "Non-nil when the vibemacs chat console has already launched Codex.")
 
 (defvar-local vibemacs-worktrees--original-header-line nil
   "Previous header line saved before marking a buffer as Codex-touched.")
@@ -131,7 +110,7 @@
 
 (defcustom vibemacs-worktrees-registry
   (expand-file-name "worktrees.json" user-emacs-directory)
-  "File storing metadata about active Vibemacs worktrees."
+  "File storing metadata about active vibemacs worktrees."
   :type 'file)
 
 (defcustom vibemacs-worktrees-open-terminal-on-create t
@@ -152,7 +131,7 @@
   :type 'file)
 
 (defcustom vibemacs-worktrees-startup-frame-size '(160 . 52)
-  "Width and height (in characters) to apply to the first Vibemacs frame.
+  "Width and height (in characters) to apply to the first vibemacs frame.
 Set to nil to keep the default frame size."
   :type '(choice (const :tag "Leave default" nil)
                  (cons :tag "Width × Height"
@@ -160,7 +139,7 @@ Set to nil to keep the default frame size."
                        (integer :tag "Rows" :value 52))))
 
 (defcustom vibemacs-worktrees-startup-layout t
-  "Whether Vibemacs should arrange a Conductor-style layout at startup."
+  "Whether vibemacs should arrange a worktrees layout at startup."
   :type 'boolean)
 
 (defcustom vibemacs-worktrees-startup-left-width 24
@@ -169,25 +148,12 @@ When nil, derive the width from the frame size."
   :type '(choice (const :tag "Automatic" nil)
                  (integer :tag "Columns")))
 
-(defcustom vibemacs-worktrees-file-tree-max-entries 2000
-  "Maximum number of nodes to render in the file tree pane.
-Set to nil to disable the limit."
-  :type '(choice (const :tag "Unlimited" nil)
-                 (integer :tag "Maximum entries"))
-  :group 'vibemacs-worktrees)
-
-(defcustom vibemacs-worktrees-file-tree-excluded-directories
-  '(".git" ".hg" ".svn" ".idea" ".vscode" "node_modules" "target" "build" "dist" ".direnv" ".venv")
-  "Directory names that are skipped when rendering the file tree pane."
-  :type '(repeat string)
-  :group 'vibemacs-worktrees)
-
 (defcustom vibemacs-worktrees-codex-log-limit 40
   "Maximum number of Codex transcript entries stored per worktree."
   :type 'integer)
 
 (defcustom vibemacs-worktrees-review-display 'magit
-  "How Vibemacs should present Codex diffs automatically.
+  "How vibemacs should present Codex diffs automatically.
 When set to `magit', open `magit-status' after Codex returns a diff.
 When set to `none', stay within the Codex diff buffer that is already shown."
   :type '(choice (const :tag "Magit status" magit)
@@ -595,7 +561,7 @@ entry (or a synthesized one) in the head position."
                    existing))))
 
 (defun vibemacs-worktrees--metadata-root ()
-  "Return the directory where Vibemacs stores per-worktree metadata."
+  "Return the directory where vibemacs stores per-worktree metadata."
   (expand-file-name "worktrees-metadata" user-emacs-directory))
 
 (defun vibemacs-worktrees--metadata-key (entry-or-root)
@@ -979,7 +945,7 @@ If ENTRY is nil prompt the user."
   "Buffer name for listing active worktrees.")
 
 (define-derived-mode vibemacs-worktrees-list-mode tabulated-list-mode "Worktrees"
-  "Display registered Vibemacs worktrees."
+  "Display registered vibemacs worktrees."
   (setq tabulated-list-format
         [("Name" 18 t)
          ("Branch" 18 t)
@@ -1007,7 +973,7 @@ If ENTRY is nil prompt the user."
 
 ;;;###autoload
 (defun vibemacs-worktrees-list ()
-  "Display all registered Vibemacs worktrees."
+  "Display all registered vibemacs worktrees."
   (interactive)
   (let ((buffer (get-buffer-create vibemacs-worktrees-buffer)))
     (with-current-buffer buffer
@@ -1017,7 +983,7 @@ If ENTRY is nil prompt the user."
     (pop-to-buffer buffer)))
 
 (defvar vibemacs-worktrees-dashboard-buffer "*Worktrees Dashboard*"
-  "Buffer name for the Vibemacs dashboard.")
+  "Buffer name for the vibemacs dashboard.")
 
 (defvar vibemacs-worktrees-dashboard-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1039,7 +1005,7 @@ If ENTRY is nil prompt the user."
   "Keymap for `vibemacs-worktrees-dashboard-mode'.")
 
 (define-derived-mode vibemacs-worktrees-dashboard-mode tabulated-list-mode "Worktrees-Dashboard"
-  "Dashboard view summarising Vibemacs worktrees."
+  "Dashboard view summarising vibemacs worktrees."
   (setq tabulated-list-format
         [("Name" 18 t)
          ("Branch" 15 t)
@@ -1154,7 +1120,7 @@ If ENTRY is nil prompt the user."
       (goto-char (point-max))
       (insert "\n  No worktrees yet.\n")
       (insert "  • Click \"Create worktree\" below or press `n` to walk through the setup.\n")
-      (insert "  • Once created, Vibemacs will list each worktree here with status, Codex activity, and
+      (insert "  • Once created, vibemacs will list each worktree here with status, Codex activity, and
              quick actions.\n")
       (insert "  • Use `SPC a w` for the dispatcher or the buttons in the welcome pane to get started.\
             n"))))
@@ -1254,12 +1220,7 @@ HELP overrides the default hover tooltip."
       (let* ((entry (vibemacs-worktrees-dashboard--current-entry))
              (root (vibemacs-worktrees--entry-root entry)))
         (vibemacs-worktrees-dashboard--activate entry)
-        (vibemacs-worktrees--refresh-file-tree entry)
-        (when (window-live-p vibemacs-worktrees--left-tree-window)
-          (set-window-buffer vibemacs-worktrees--left-tree-window
-                             (vibemacs-worktrees--file-tree-buffer entry)))
         (vibemacs-worktrees--files-refresh entry nil)
-        (vibemacs-worktrees--refresh-terminal entry)
         (vibemacs-worktrees-center-show-chat entry)
         (message "Activated worktree %s" (vibemacs-worktrees--entry-name entry))
         (ignore-errors (tabulated-list-goto-id root))))))
@@ -1285,9 +1246,7 @@ HELP overrides the default hover tooltip."
   (interactive)
   (let ((entry (vibemacs-worktrees-dashboard--current-entry)))
     (vibemacs-worktrees-dashboard--activate entry)
-    (vibemacs-worktrees--refresh-terminal entry)
-    (when (window-live-p vibemacs-worktrees--right-terminal-window)
-      (select-window vibemacs-worktrees--right-terminal-window))))
+    (vibemacs-worktrees-center-show-terminal entry)))
 
 (defun vibemacs-worktrees-dashboard-run ()
   "Run the main script for the worktree at point."
@@ -1320,7 +1279,7 @@ HELP overrides the default hover tooltip."
                (string=
                 (directory-file-name (expand-file-name root))
                 (directory-file-name (expand-file-name repo))))
-      (user-error "Cannot delete the primary checkout from Vibemacs"))
+      (user-error "Cannot delete the primary checkout from vibemacs"))
     (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
                                (abbreviate-file-name root)
                                (if (and branch (not (string-empty-p branch))) branch "(none)")))
@@ -1360,12 +1319,12 @@ HELP overrides the default hover tooltip."
     (vibemacs-worktrees-codex-apply entry)))
 
 (defun vibemacs-worktrees-dashboard ()
-  "Display the Vibemacs dashboard view."
+  "Display the vibemacs dashboard view."
   (interactive)
   (pop-to-buffer (vibemacs-worktrees-dashboard--setup-buffer)))
 
 (transient-define-prefix vibemacs-worktrees-dispatch ()
-			 "Top-level dispatcher for Vibemacs worktree actions."
+			 "Top-level dispatcher for vibemacs worktree actions."
 			 ["Worktrees"
 			  ("n" "New worktree" vibemacs-worktrees-new)
 			  ("l" "List worktrees" vibemacs-worktrees-list)
@@ -1547,7 +1506,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
   (vibemacs-worktrees--ensure-vterm)
   (let* ((name (vibemacs-worktrees--entry-name entry))
          (root (vibemacs-worktrees--entry-root entry))
-         (buffer-name (format "*Vibemacs Chat %s*" name)))
+         (buffer-name (format "*vibemacs Chat %s*" name)))
     (vibemacs-worktrees--chat-buffer-vterm buffer-name root)))
 
 (defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root)
@@ -1588,7 +1547,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
   (let* ((root (vibemacs-worktrees--entry-root entry))
          (buffer (gethash root vibemacs-worktrees--transcript-buffers)))
     (unless (and buffer (buffer-live-p buffer))
-      (setq buffer (get-buffer-create (format "*Vibemacs Transcript %s*"
+      (setq buffer (get-buffer-create (format "*vibemacs Transcript %s*"
                                               (vibemacs-worktrees--entry-name entry))))
       (puthash root buffer vibemacs-worktrees--transcript-buffers)
       (with-current-buffer buffer
@@ -1701,289 +1660,41 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
       (insert (format "Files: %s\n" (string-join files ", "))))
     (insert "\n")))
 
-(defvar vibemacs-worktrees-file-tree-mode-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map special-mode-map)
-    (define-key map (kbd "RET") #'vibemacs-worktrees-file-tree-visit)
-    (define-key map (kbd "g") #'vibemacs-worktrees-file-tree-refresh)
-    map)
-  "Keymap for `vibemacs-worktrees-file-tree-mode'.")
-
-(define-derived-mode vibemacs-worktrees-file-tree-mode special-mode "Worktree-Tree"
-  "Major mode for the Vibemacs project file tree pane."
-  (setq truncate-lines t)
-  (setq buffer-read-only t))
-
-(defvar-local vibemacs-worktrees--file-tree-entry nil
-  "Worktree entry associated with the current file tree buffer.")
-
-(defun vibemacs-worktrees-file-tree-visit ()
-  "Open the file at point in the center pane."
-  (interactive)
-  (let* ((path (get-text-property (point) 'vibemacs-file-tree-path))
-         (entry (or (get-text-property (point) 'vibemacs-file-tree-entry)
-                    vibemacs-worktrees--file-tree-entry)))
-    (unless (and entry path)
-      (user-error "No file under point"))
-    (vibemacs-worktrees-center-open-file entry path)))
-
-(defun vibemacs-worktrees-file-tree-refresh ()
-  "Refresh the file tree for the current worktree."
-  (interactive)
-  (unless vibemacs-worktrees--file-tree-entry
-    (user-error "No worktree associated with this file tree buffer"))
-  (vibemacs-worktrees--refresh-file-tree vibemacs-worktrees--file-tree-entry))
-
-(defun vibemacs-worktrees--file-tree-buffer (entry)
-  "Return the file tree buffer for ENTRY, creating it if necessary."
-  (if (not entry)
-      (let ((buffer (get-buffer-create "*Vibemacs File Tree*")))
-        (with-current-buffer buffer
-          (vibemacs-worktrees-file-tree-mode))
-        buffer)
-    (let* ((root (vibemacs-worktrees--entry-root entry))
-           (buffer (gethash root vibemacs-worktrees--file-tree-buffers)))
-      (unless (and buffer (buffer-live-p buffer))
-        (setq buffer (get-buffer-create
-                      (format vibemacs-worktrees--file-tree-buffer-prefix
-                              (vibemacs-worktrees--entry-name entry))))
-        (puthash root buffer vibemacs-worktrees--file-tree-buffers)
-        (with-current-buffer buffer
-          (vibemacs-worktrees-file-tree-mode)))
-      buffer)))
-
-(defun vibemacs-worktrees--file-tree-skip-path-p (path)
-  "Return non-nil when PATH should be hidden from the file tree."
-  (let ((parts (split-string path "/" t)))
-    (and parts
-         (member (car parts) vibemacs-worktrees-file-tree-excluded-directories))))
-
-(defun vibemacs-worktrees--collect-project-files (entry)
-  "Return a list of project file paths relative to ENTRY root."
-  (let* ((root (vibemacs-worktrees--entry-root entry))
-         (default-directory root)
-         (project (ignore-errors (project-current nil root)))
-         files)
-    (setq files
-          (cond
-           (project
-            (mapcar (lambda (f)
-                      (if (file-name-absolute-p f)
-                          (file-relative-name f root)
-                        f))
-                    (project-files project)))
-           (t
-            (vibemacs-worktrees--collect-files-recursively root))))
-    (cl-remove-if #'vibemacs-worktrees--file-tree-skip-path-p files)))
-
-(defun vibemacs-worktrees--collect-files-recursively (root)
-  "Collect files under ROOT, returning paths relative to ROOT."
-  (let (results)
-    (cl-labels ((walk (dir)
-                      (dolist (entry (directory-files dir nil nil t))
-                        (unless (member entry '("." ".."))
-                          (let* ((absolute (expand-file-name entry dir))
-                                 (relative (file-relative-name absolute root)))
-                            (cond
-                             ((file-directory-p absolute)
-                              (unless (vibemacs-worktrees--file-tree-skip-path-p relative)
-                                (walk absolute)))
-                             (t
-                              (push relative results)))))))
-      (when (file-directory-p root)
-        (walk root)))
-    (cl-sort results #'string<)))
-
-(defun vibemacs-worktrees--build-file-tree-nodes (files)
-  "Turn FILES into displayable file tree nodes."
-  (let ((dirs (make-hash-table :test 'equal))
-        (nodes nil))
-    (dolist (file (cl-sort (copy-sequence files) #'string<))
-      (let* ((components (split-string file "/" t))
-             (dir-components (butlast components)))
-        (cl-loop for i from 1 to (length dir-components)
-                 for dir = (mapconcat #'identity (cl-subseq components 0 i) "/")
-                 unless (gethash dir dirs)
-                 do (puthash dir t dirs)
-                    (push (list :type 'dir :path dir) nodes)))
-      (push (list :type 'file :path file) nodes))
-    (setq nodes (cl-sort nodes #'string< :key (lambda (node) (plist-get node :path))))
-    (dolist (node nodes)
-      (let* ((path (plist-get node :path))
-             (components (split-string path "/" t))
-             (depth (max 0 (1- (length components)))))
-        (setf (plist-get node :depth) depth)))
-    nodes))
-
-(defun vibemacs-worktrees--insert-file-tree-node (entry node)
-  "Insert NODE for ENTRY into the current buffer."
-  (let* ((depth (plist-get node :depth))
-         (type (plist-get node :type))
-         (path (plist-get node :path))
-         (indent (make-string (* depth 2) ?\s)))
-    (insert indent)
-    (pcase type
-      ('dir
-       (let ((name (file-name-nondirectory path)))
-         (insert (propertize (concat name "/") 'face 'font-lock-keyword-face))))
-      ('file
-       (let* ((name (file-name-nondirectory path))
-              (button-text (if (string-empty-p name) path name))
-              (relative path))
-         (insert-text-button button-text
-                             'follow-link t
-                             'help-echo (format "Open %s" relative)
-                             'vibemacs-file-tree-path relative
-                             'vibemacs-file-tree-entry entry
-                             'action (lambda (_)
-                                       (vibemacs-worktrees-center-open-file entry relative))))))
-    (insert "\n")))
-
-(defun vibemacs-worktrees--refresh-file-tree (entry)
-  "Populate the file tree buffer for ENTRY and return it."
-  (let ((buffer (vibemacs-worktrees--file-tree-buffer entry)))
-    (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (setq-local vibemacs-worktrees--file-tree-entry entry)
-        (cond
-         ((not entry)
-          (insert "Select a worktree to view its file tree.\n"))
-         (t
-          (let* ((files (vibemacs-worktrees--collect-project-files entry))
-                 (nodes (vibemacs-worktrees--build-file-tree-nodes files))
-                 (total (length nodes))
-                 (limit vibemacs-worktrees-file-tree-max-entries)
-                 (display-nodes (if (and limit (> total limit))
-                                    (seq-take nodes limit)
-                                  nodes))
-                 (truncated (and limit (> total limit))))
-            (if (null display-nodes)
-                (insert "No project files found.\n")
-              (dolist (node display-nodes)
-                (vibemacs-worktrees--insert-file-tree-node entry node)))
-            (when truncated
-              (insert
-               (format "\n… truncated to %d of %d entries. Adjust `vibemacs-worktrees-file-tree-max-entries` to view more.\n"
-                       limit total)))))))
-      (goto-char (point-min)))
-    buffer))
-
-(defvar vibemacs-worktrees-changed-files-mode-map
-  (let ((map (make-sparse-keymap)))
-    (set-keymap-parent map special-mode-map)
-    (define-key map (kbd "RET") #'vibemacs-worktrees-changed-files-visit)
-    (define-key map (kbd "d") #'vibemacs-worktrees-changed-files-diff)
-    map)
-  "Keymap for `vibemacs-worktrees-changed-files-mode'.")
-
-(define-derived-mode vibemacs-worktrees-changed-files-mode special-mode "Worktree-Changes"
-  "Major mode for the changed files pane."
-  (setq truncate-lines t)
-  (setq buffer-read-only t))
-
-(defvar-local vibemacs-worktrees--changed-files-entry nil
-  "Worktree entry associated with the current changed files buffer.")
-
-(defun vibemacs-worktrees-changed-files-visit ()
-  "Open the changed file at point in the center pane."
-  (interactive)
-  (let* ((path (get-text-property (point) 'vibemacs-changed-file-path))
-         (entry (or (get-text-property (point) 'vibemacs-changed-file-entry)
-                    vibemacs-worktrees--changed-files-entry)))
-    (unless (and entry path)
-      (user-error "No file under point"))
-    (vibemacs-worktrees-center-open-file entry path)))
-
-(defun vibemacs-worktrees-changed-files-diff ()
-  "Open the diff for the changed file at point in the center pane."
-  (interactive)
-  (let* ((path (get-text-property (point) 'vibemacs-changed-file-path))
-         (entry (or (get-text-property (point) 'vibemacs-changed-file-entry)
-                    vibemacs-worktrees--changed-files-entry)))
-    (unless (and entry path)
-      (user-error "No file under point"))
-    (vibemacs-worktrees-center-show-diff entry path)))
-
-(defun vibemacs-worktrees--changed-files-buffer ()
-  "Return the buffer used to display changed files."
-  (let ((buffer (get-buffer-create vibemacs-worktrees--changed-files-buffer-name)))
-    (with-current-buffer buffer
-      (vibemacs-worktrees-changed-files-mode)
-      (setq-local header-line-format nil))
-    buffer))
-
 (defun vibemacs-worktrees--files-refresh (entry files)
-  "Refresh the changed files pane for ENTRY, highlighting FILES touched by Codex."
-  (let ((buffer (vibemacs-worktrees--changed-files-buffer)))
+  "Refresh diff tab based on git status and highlight FILES touched by Codex."
+  (let* ((status-list (vibemacs-worktrees--status-files entry))
+         (highlight (and files (cl-remove-if #'string-empty-p files)))
+         (buffer (vibemacs-worktrees--diff-buffer)))
     (with-current-buffer buffer
-      (let ((inhibit-read-only t))
+      (unless (derived-mode-p 'special-mode)
+        (special-mode))
+      (let ((inhibit-read-only t)
+            (default-directory (vibemacs-worktrees--entry-root entry)))
         (erase-buffer)
-        (if (not entry)
-            (insert "Select a worktree to view changed files.\n")
-          (setq-local vibemacs-worktrees--changed-files-entry entry)
-          (let* ((status-list (vibemacs-worktrees--status-files entry))
-                 (highlight (and files (cl-remove-if #'string-empty-p files)))
-                 (default-directory (vibemacs-worktrees--entry-root entry)))
-            (insert (format "Files changed — %s\n" (vibemacs-worktrees--entry-name entry)))
-            (insert "-------------------------------\n")
-            (cond
-             (status-list
-              (dolist (status status-list)
-                (pcase-let ((`(,code . ,path) status))
-                  (let* ((display (if (and highlight (member path highlight))
-                                      (propertize path 'face 'success)
-                                    path))
-                         (button-text display)
-                         (relative path))
-                    (insert (format "%s " (if (> (length code) 0) code "??")))
-                    (insert-text-button button-text
-                                        'follow-link t
-                                        'help-echo "Open file in center pane (press d for diff)"
-                                        'vibemacs-changed-file-path relative
-                                        'vibemacs-changed-file-entry entry
-                                        'action (lambda (_)
-                                                  (vibemacs-worktrees-center-open-file entry relative)))
-                    (insert "\n"))))
-              (insert "\nClick a file to open it in the main pane, or press d to view its diff.\n"))
-             (highlight
-              (insert "No git changes detected, but Codex touched:\n")
-              (dolist (file highlight)
-                (insert (format "• %s\n" file)))
-              (insert "\nRun `git status` if this list looks outdated.\n"))
-             (t
-              (insert "Working tree clean. Run Codex or edit files to populate this list.\n")))))))
-    (when (window-live-p vibemacs-worktrees--right-files-window)
-      (set-window-buffer vibemacs-worktrees--right-files-window buffer))
-    buffer))
-
-(defun vibemacs-worktrees--refresh-terminal (entry)
-  "Ensure the bottom-right terminal reflects ENTRY."
-  (when (window-live-p vibemacs-worktrees--right-terminal-window)
-    (if (not entry)
-        (with-selected-window vibemacs-worktrees--right-terminal-window
-          (let ((buffer (get-buffer-create "*Vibemacs Terminal*")))
-            (with-current-buffer buffer
-              (erase-buffer)
-              (insert "Select a worktree to launch its terminal.\n")
-              (special-mode))
-            (set-window-buffer vibemacs-worktrees--right-terminal-window buffer)))
-      (let* ((window vibemacs-worktrees--right-terminal-window)
-             (name (vibemacs-worktrees--entry-name entry))
-             (root (vibemacs-worktrees--entry-root entry))
-             (buffer-name (format vibemacs-worktrees-terminal-buffer-prefix name)))
-        (vibemacs-worktrees--ensure-vterm)
-        (with-selected-window window
-          (let ((default-directory root)
-                (vterm-buffer-name buffer-name))
-            (if (buffer-live-p (get-buffer buffer-name))
-                (switch-to-buffer buffer-name)
-              (vterm)))
-          (set-window-dedicated-p window t)
-          (set-window-parameter window 'no-delete-other-windows t))
-        (when-let ((buffer (get-buffer buffer-name)))
-          (with-current-buffer buffer
-            (setq-local header-line-format nil)))))))
+        (insert (format "Files changed — %s\n" (vibemacs-worktrees--entry-name entry)))
+        (insert "-------------------------------\n")
+        (cond
+         (status-list
+          (dolist (status status-list)
+            (pcase-let ((`(,code . ,path) status))
+              (let ((display (if (and highlight (member path highlight))
+                                 (propertize path 'face 'success)
+                               path)))
+                (insert (format "%s " (if (> (length code) 0) code "??")))
+                (insert-text-button display
+                                    'follow-link t
+                                    'help-echo "View diff in center pane"
+                                    'action (lambda (_)
+                                              (vibemacs-worktrees-center-show-diff entry path)))
+                (insert "\n"))))
+          (insert "\nClick a file to view its diff or switch tabs above.\n"))
+         (highlight
+          (insert "No git changes detected, but Codex touched:\n")
+          (dolist (file highlight)
+            (insert (format "• %s\n" file)))
+          (insert "\nRun `git status` if this list looks outdated.\n"))
+         (t
+          (insert "Working tree clean. Run Codex or edit files to populate this list.\n")))))))
 
 (defun vibemacs-worktrees--log-codex (entry prompt result)
   "Append a Codex RESULT for ENTRY with PROMPT to the activity buffer."
@@ -2001,7 +1712,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
           (when buffer
             (vibemacs-worktrees--mark-buffer buffer)))))
     (vibemacs-worktrees--notify
-     "Vibemacs worktree"
+     "vibemacs worktree"
      (format "Codex produced a plan for %s" (vibemacs-worktrees--entry-name entry)))
     (let ((buffer (vibemacs-worktrees--activity-buffer)))
       (with-current-buffer buffer
@@ -2025,32 +1736,6 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
       (vibemacs-worktrees--transcript-append entry prompt result (plist-get record :timestamp) files)
       (vibemacs-worktrees--files-refresh entry files)
       (vibemacs-worktrees--display-review entry result))))
-
-(defun vibemacs-worktrees-center-open-file (entry path)
-  "Open PATH from worktree ENTRY inside the center pane."
-  (let ((entry (or entry (vibemacs-worktrees-center--current-entry))))
-    (unless entry
-      (user-error "Select a worktree before opening files"))
-    (unless (and path (not (string-empty-p path)))
-      (user-error "No file path provided"))
-    (let* ((root (vibemacs-worktrees--entry-root entry))
-           (absolute (expand-file-name path root))
-           (window (and (window-live-p vibemacs-worktrees--center-window)
-                        vibemacs-worktrees--center-window)))
-      (unless (file-exists-p absolute)
-        (user-error "File does not exist: %s" path))
-      (unless window
-        (user-error "Center pane not initialised yet"))
-      (setq vibemacs-worktrees--center-window window)
-      (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
-      (vibemacs-worktrees-dashboard--activate entry)
-      (set-window-parameter window 'vibemacs-center-entry entry)
-      (set-window-parameter window 'vibemacs-center-active 'file)
-      (let ((buffer (find-file-noselect absolute)))
-        (with-selected-window window
-          (switch-to-buffer buffer))
-        (select-window window)
-        (force-mode-line-update t)))))
 
 (defun vibemacs-worktrees-center-show-chat (&optional entry)
   "Activate the chat tab in the center pane for ENTRY.
@@ -2143,12 +1828,11 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
           (let ((buffer (vibemacs-worktrees-center--render-diff entry file)))
             (set-window-buffer vibemacs-worktrees--center-window buffer))
         (vibemacs-worktrees--files-refresh entry nil)
-        (let ((buffer (vibemacs-worktrees-center--render-diff entry nil)))
-          (set-window-buffer vibemacs-worktrees--center-window buffer)))
+        (set-window-buffer vibemacs-worktrees--center-window (vibemacs-worktrees--diff-buffer)))
       (force-mode-line-update t))))
 
 (defun vibemacs-worktrees-show-activity ()
-  "Display the Vibemacs worktree activity log."
+  "Display the vibemacs worktree activity log."
   (interactive)
   (display-buffer (vibemacs-worktrees--activity-buffer)))
 
@@ -2246,7 +1930,7 @@ Interactively prompts for both when omitted."
           (magit-status (vibemacs-worktrees--entry-root entry)))))))
 
 (defun vibemacs-worktrees--apply-startup-layout (&optional force)
-  "Arrange the Vibemacs dashboard + chat layout.
+  "Arrange the vibemacs dashboard + chat layout.
 When FORCE is non-nil, rebuild the layout even if it already ran."
   (when (and vibemacs-worktrees-startup-layout
              (or force (not vibemacs-worktrees--startup-applied)))
@@ -2262,109 +1946,64 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
       (let* ((root-window (selected-window))
              (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
              (frame-width (window-total-width root-window))
-             (min-side 20))
-        (let ((layout-built
-               (condition-case err
-                   (let* ((max-side (max min-side
-                                         (floor (/ (max 0 (- frame-width (* 2 min-side))) 2))))
-                          (auto-width (max min-side (min max-side (floor (* frame-width 0.2)))))
-                          (desired (or vibemacs-worktrees-startup-left-width auto-width))
-                          (side-width (max min-side (min max-side desired)))
-                          (left-window (split-window root-window side-width 'left))
-                          (right-window (split-window root-window side-width 'right))
-                          (center-window root-window)
-                          (left-height (window-total-height left-window))
-                          (right-height (window-total-height right-window))
-                          (min-pane-height 10)
-                          (left-top-height (max min-pane-height (floor (/ left-height 2))))
-                          (right-top-height (max min-pane-height (floor (/ right-height 2))))
-                          (left-bottom (split-window left-window left-top-height 'below))
-                          (left-top left-window)
-                          (right-bottom (split-window right-window right-top-height 'below))
-                          (right-top right-window)
-                          (entries (vibemacs-worktrees--entries-safe))
-                          (entry (or (cl-find vibemacs-worktrees--active-root entries
-                                              :key #'vibemacs-worktrees--entry-root
-                                              :test #'string=)
-                                     (car entries))))
-                     (window-resize left-top (- side-width (window-total-width left-top)) t)
-                     (window-resize right-top (- side-width (window-total-width right-top)) t)
-                     (setq vibemacs-worktrees--left-dashboard-window left-top
-                           vibemacs-worktrees--left-tree-window left-bottom
-                           vibemacs-worktrees--right-files-window right-top
-                           vibemacs-worktrees--right-terminal-window right-bottom
-                           vibemacs-worktrees--center-window center-window)
-                     (dolist (win (list left-top left-bottom right-top right-bottom))
-                       (when (window-live-p win)
-                         (set-window-parameter win 'window-size-fixed 'width)
-                         (set-window-parameter win 'window-preserved-size (cons 'width side-width))
-                         (set-window-parameter win 'no-delete-other-windows t)))
-                     (set-window-buffer left-top dashboard-buffer)
-                     (set-window-dedicated-p left-top t)
-                     (if entry
-                         (progn
-                           (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
-                           (vibemacs-worktrees-dashboard--activate entry)
-                           (with-selected-window left-top
-                             (goto-char (point-min))
-                             (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
-                             (when (bound-and-true-p hl-line-mode)
-                               (hl-line-highlight)))
-                           (vibemacs-worktrees--refresh-file-tree entry)
-                           (when (window-live-p left-bottom)
-                             (set-window-buffer left-bottom (vibemacs-worktrees--file-tree-buffer entry)))
-                           (vibemacs-worktrees--files-refresh entry nil)
-                           (vibemacs-worktrees--refresh-terminal entry)
-                           (when (window-live-p right-top)
-                             (set-window-buffer right-top (vibemacs-worktrees--changed-files-buffer)))
-                           (when (window-live-p center-window)
-                             (condition-case err
-                                 (progn
-                                   (select-window center-window)
-                                   (vibemacs-worktrees-center-show-chat entry))
-                               (error
-                                (message "vibemacs: unable to open chat console (%s)"
-                                         (error-message-string err))))))
-                       (progn
-                         (when (window-live-p left-bottom)
-                           (vibemacs-worktrees--refresh-file-tree nil)
-                           (set-window-buffer left-bottom (vibemacs-worktrees--file-tree-buffer nil)))
-                         (vibemacs-worktrees--files-refresh nil nil)
-                         (vibemacs-worktrees--refresh-terminal nil)
-                         (when (window-live-p center-window)
-                           (let ((placeholder (get-buffer-create "*Vibemacs Center*")))
-                             (with-current-buffer placeholder
-                               (erase-buffer)
-                               (insert "Select a worktree to start Codex chat.\n")
-                               (special-mode))
-                             (set-window-buffer center-window placeholder)
-                             (select-window center-window))))))
-                     (setq applied t)
-                     side-width)
-                 (error
-                  (message "vibemacs: unable to build full layout (%s)" (error-message-string err))
-                  nil))))
-          (unless layout-built
-            (setq vibemacs-worktrees--center-window nil)
-            (set-window-buffer root-window dashboard-buffer)
-            (set-window-dedicated-p root-window t)
+             (min-left 20)
+             (min-center 80)
+             (can-split (> frame-width (+ min-left min-center))))
+        (if (not can-split)
+            (progn
+              (setq vibemacs-worktrees--center-window nil)
+              (set-window-buffer root-window dashboard-buffer)
+              (set-window-dedicated-p root-window t)
+              (setq applied t)
+              (message "vibemacs: frame too narrow for full layout; showing dashboard only."))
+          (let* ((max-left (max min-left (- frame-width min-center)))
+                 (auto-width (max min-left (min max-left (floor (* frame-width 0.25)))))
+                 (desired (or vibemacs-worktrees-startup-left-width auto-width))
+                 (left-width (max min-left (min max-left desired)))
+                 (left-window (split-window root-window left-width 'left))
+                 (right-window root-window)
+                 (entries (vibemacs-worktrees--entries-safe))
+                 (entry (or (cl-find vibemacs-worktrees--active-root entries
+                                     :key #'vibemacs-worktrees--entry-root
+                                     :test #'string=)
+                            (car entries))))
+            (set-window-buffer left-window dashboard-buffer)
+            (set-window-dedicated-p left-window t)
+            (set-window-parameter left-window 'window-size-fixed 'width)
+            (set-window-parameter left-window 'no-delete-other-windows t)
+            (window-resize left-window (- left-width (window-total-width left-window)) t)
+            (set-window-parameter left-window 'window-preserved-size
+                                  (cons 'width left-width))
+            (setq vibemacs-worktrees--center-window right-window)
+            (when entry
+              (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
+              (vibemacs-worktrees-dashboard--activate entry)
+              (with-selected-window left-window
+                (goto-char (point-min))
+                (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
+                (when (bound-and-true-p hl-line-mode)
+                  (hl-line-highlight)))
+              (select-window right-window)
+              (condition-case err
+                  (vibemacs-worktrees-center-show-chat entry)
+                (error
+                 (message "vibemacs: unable to open chat console (%s)"
+                          (error-message-string err))))
+              (vibemacs-worktrees--files-refresh entry nil))
             (setq applied t)
-            (message "vibemacs: fallback dashboard layout (frame width=%d)" frame-width))
-          (when layout-built
-            (message "vibemacs: applied conductor layout (frame width=%d side width=%d)"
-                     frame-width layout-built))))))
+            (select-window right-window)))
         (setq vibemacs-worktrees--startup-applied applied)
         applied))))
 
 (defun vibemacs-worktrees-launch-home (&optional force)
-  "Launch the Vibemacs dashboard layout.
+  "Launch the vibemacs dashboard layout.
 With FORCE (interactive prefix), rebuild the layout even if it was already applied."
   (interactive "P")
   (when force
     (setq vibemacs-worktrees--startup-applied nil))
   (if vibemacs-worktrees-startup-layout
       (vibemacs-worktrees--apply-startup-layout force)
-    (message "Vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
+    (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
 
 (defun vibemacs-worktrees--ensure-vterm ()
   "Ensure vterm is available, signalling a helpful error otherwise."
@@ -2374,8 +2013,8 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
               (require 'vterm nil 'noerror)))
     (unless vibemacs-worktrees--has-vterm
       (if (fboundp 'module-load)
-          (user-error "Vibemacs requires the `vterm` package. Install it (M-x package-install RET vterm) and ensure it is compiled.")
-        (user-error "Vibemacs requires an Emacs built with dynamic modules to use vterm."))))
+          (user-error "vibemacs requires the `vterm` package. Install it (M-x package-install RET vterm) and ensure it is compiled.")
+        (user-error "vibemacs requires an Emacs built with dynamic modules to use vterm."))))
   vibemacs-worktrees--has-vterm)
 
 (provide 'worktrees)
