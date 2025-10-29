@@ -207,13 +207,22 @@ Signals an error if the command exits with non-zero."
                  (buffer-string)))))))
 
 (defun vibemacs-worktrees--read-repo ()
-  "Prompt for a git repository path, defaulting to the current project root."
+  "Return the git repository rooted at this Emacs session's launch directory.
+Avoid prompting the user—assume Codex is launched from the desired repository."
   (let* ((project (project-current nil))
-         (default (when project (project-root project)))
-         (dir (read-directory-name "Repository root: " default default t)))
-    (unless (file-directory-p (expand-file-name ".git" dir))
-      (user-error "%s is not a git repository" dir))
-    (expand-file-name dir)))
+         (launch-dir (when (and (boundp 'command-line-default-directory)
+                                command-line-default-directory)
+                       command-line-default-directory))
+         (candidates (delq nil (list launch-dir
+                                     (when project (project-root project))
+                                     default-directory)))
+         (repo (cl-loop for dir in candidates
+                        for expanded = (and dir (expand-file-name dir))
+                        for root = (and expanded (vibemacs-worktrees--git-root expanded))
+                        when root return root)))
+    (unless repo
+      (user-error "Unable to determine git repository for this session"))
+    repo))
 
 (defun vibemacs-worktrees--read-worktree-name ()
   "Prompt for a new worktree name."
