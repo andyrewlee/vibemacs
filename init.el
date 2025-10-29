@@ -14,7 +14,7 @@
       (require 'worktrees)
       (add-hook 'emacs-startup-hook #'vibemacs-worktrees-launch-home))
   (error
-   (message "Vibemacs: failed to load worktrees (%s)" (error-message-string err))))
+   (message "vibemacs: failed to load worktrees (%s)" (error-message-string err))))
 
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")

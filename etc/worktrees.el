@@ -1,4 +1,4 @@
-;;; worktrees.el --- Vibemacs worktree helpers -*- lexical-binding: t; -*-
+;;; worktrees.el --- vibemacs worktree helpers -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
 (require 'json)
@@ -32,7 +32,7 @@
 (defvar vibemacs-worktrees--activity-buffer-name "*Worktrees Activity*"
   "Name of the persistent activity log buffer.")
 
-(defvar vibemacs-worktrees-diff-buffer "*Vibemacs Diff*"
+(defvar vibemacs-worktrees-diff-buffer "*vibemacs Diff*"
   "Buffer name for the diff review pane.")
 
 (defvar vibemacs-worktrees-terminal-buffer-prefix "*worktree-%s-term*"
@@ -45,7 +45,7 @@
   "Hash table mapping worktree roots to transcript buffers.")
 
 (defvar vibemacs-worktrees--startup-applied nil
-  "Whether the Vibemacs startup layout has already been applied this session.")
+  "Whether the vibemacs startup layout has already been applied this session.")
 
 (defvar vibemacs-worktrees--active-root nil
   "Root path of the worktree currently focused in the center pane.")
@@ -75,7 +75,7 @@
   "Tooltip displayed when hovering dashboard worktree rows.")
 
 (defvar-local vibemacs-worktrees--chat-command-started nil
-  "Non-nil when the Vibemacs chat console has already launched Codex.")
+  "Non-nil when the vibemacs chat console has already launched Codex.")
 
 (defvar-local vibemacs-worktrees--original-header-line nil
   "Previous header line saved before marking a buffer as Codex-touched.")
@@ -110,7 +110,7 @@
 
 (defcustom vibemacs-worktrees-registry
   (expand-file-name "worktrees.json" user-emacs-directory)
-  "File storing metadata about active Vibemacs worktrees."
+  "File storing metadata about active vibemacs worktrees."
   :type 'file)
 
 (defcustom vibemacs-worktrees-open-terminal-on-create t
@@ -131,7 +131,7 @@
   :type 'file)
 
 (defcustom vibemacs-worktrees-startup-frame-size '(160 . 52)
-  "Width and height (in characters) to apply to the first Vibemacs frame.
+  "Width and height (in characters) to apply to the first vibemacs frame.
 Set to nil to keep the default frame size."
   :type '(choice (const :tag "Leave default" nil)
                  (cons :tag "Width × Height"
@@ -139,7 +139,7 @@ Set to nil to keep the default frame size."
                        (integer :tag "Rows" :value 52))))
 
 (defcustom vibemacs-worktrees-startup-layout t
-  "Whether Vibemacs should arrange a Conductor-style layout at startup."
+  "Whether vibemacs should arrange a worktrees layout at startup."
   :type 'boolean)
 
 (defcustom vibemacs-worktrees-startup-left-width 24
@@ -153,7 +153,7 @@ When nil, derive the width from the frame size."
   :type 'integer)
 
 (defcustom vibemacs-worktrees-review-display 'magit
-  "How Vibemacs should present Codex diffs automatically.
+  "How vibemacs should present Codex diffs automatically.
 When set to `magit', open `magit-status' after Codex returns a diff.
 When set to `none', stay within the Codex diff buffer that is already shown."
   :type '(choice (const :tag "Magit status" magit)
@@ -261,7 +261,7 @@ Signals an error if the command exits with non-zero."
                    for entry = (vibemacs-worktrees--entry-from-json record)
                    when entry collect entry))
       (error
-       (message "Vibemacs: ignoring corrupt registry (%s)" (error-message-string err))
+       (message "vibemacs: ignoring corrupt registry (%s)" (error-message-string err))
        nil))))
 
 (defun vibemacs-worktrees--json-get (obj key)
@@ -561,7 +561,7 @@ entry (or a synthesized one) in the head position."
                    existing))))
 
 (defun vibemacs-worktrees--metadata-root ()
-  "Return the directory where Vibemacs stores per-worktree metadata."
+  "Return the directory where vibemacs stores per-worktree metadata."
   (expand-file-name "worktrees-metadata" user-emacs-directory))
 
 (defun vibemacs-worktrees--metadata-key (entry-or-root)
@@ -945,7 +945,7 @@ If ENTRY is nil prompt the user."
   "Buffer name for listing active worktrees.")
 
 (define-derived-mode vibemacs-worktrees-list-mode tabulated-list-mode "Worktrees"
-  "Display registered Vibemacs worktrees."
+  "Display registered vibemacs worktrees."
   (setq tabulated-list-format
         [("Name" 18 t)
          ("Branch" 18 t)
@@ -973,7 +973,7 @@ If ENTRY is nil prompt the user."
 
 ;;;###autoload
 (defun vibemacs-worktrees-list ()
-  "Display all registered Vibemacs worktrees."
+  "Display all registered vibemacs worktrees."
   (interactive)
   (let ((buffer (get-buffer-create vibemacs-worktrees-buffer)))
     (with-current-buffer buffer
@@ -983,7 +983,7 @@ If ENTRY is nil prompt the user."
     (pop-to-buffer buffer)))
 
 (defvar vibemacs-worktrees-dashboard-buffer "*Worktrees Dashboard*"
-  "Buffer name for the Vibemacs dashboard.")
+  "Buffer name for the vibemacs dashboard.")
 
 (defvar vibemacs-worktrees-dashboard-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1005,7 +1005,7 @@ If ENTRY is nil prompt the user."
   "Keymap for `vibemacs-worktrees-dashboard-mode'.")
 
 (define-derived-mode vibemacs-worktrees-dashboard-mode tabulated-list-mode "Worktrees-Dashboard"
-  "Dashboard view summarising Vibemacs worktrees."
+  "Dashboard view summarising vibemacs worktrees."
   (setq tabulated-list-format
         [("Name" 18 t)
          ("Branch" 15 t)
@@ -1120,7 +1120,7 @@ If ENTRY is nil prompt the user."
       (goto-char (point-max))
       (insert "\n  No worktrees yet.\n")
       (insert "  • Click \"Create worktree\" below or press `n` to walk through the setup.\n")
-      (insert "  • Once created, Vibemacs will list each worktree here with status, Codex activity, and
+      (insert "  • Once created, vibemacs will list each worktree here with status, Codex activity, and
              quick actions.\n")
       (insert "  • Use `SPC a w` for the dispatcher or the buttons in the welcome pane to get started.\
             n"))))
@@ -1279,7 +1279,7 @@ HELP overrides the default hover tooltip."
                (string=
                 (directory-file-name (expand-file-name root))
                 (directory-file-name (expand-file-name repo))))
-      (user-error "Cannot delete the primary checkout from Vibemacs"))
+      (user-error "Cannot delete the primary checkout from vibemacs"))
     (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
                                (abbreviate-file-name root)
                                (if (and branch (not (string-empty-p branch))) branch "(none)")))
@@ -1319,12 +1319,12 @@ HELP overrides the default hover tooltip."
     (vibemacs-worktrees-codex-apply entry)))
 
 (defun vibemacs-worktrees-dashboard ()
-  "Display the Vibemacs dashboard view."
+  "Display the vibemacs dashboard view."
   (interactive)
   (pop-to-buffer (vibemacs-worktrees-dashboard--setup-buffer)))
 
 (transient-define-prefix vibemacs-worktrees-dispatch ()
-			 "Top-level dispatcher for Vibemacs worktree actions."
+			 "Top-level dispatcher for vibemacs worktree actions."
 			 ["Worktrees"
 			  ("n" "New worktree" vibemacs-worktrees-new)
 			  ("l" "List worktrees" vibemacs-worktrees-list)
@@ -1506,7 +1506,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
   (vibemacs-worktrees--ensure-vterm)
   (let* ((name (vibemacs-worktrees--entry-name entry))
          (root (vibemacs-worktrees--entry-root entry))
-         (buffer-name (format "*Vibemacs Chat %s*" name)))
+         (buffer-name (format "*vibemacs Chat %s*" name)))
     (vibemacs-worktrees--chat-buffer-vterm buffer-name root)))
 
 (defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root)
@@ -1547,7 +1547,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
   (let* ((root (vibemacs-worktrees--entry-root entry))
          (buffer (gethash root vibemacs-worktrees--transcript-buffers)))
     (unless (and buffer (buffer-live-p buffer))
-      (setq buffer (get-buffer-create (format "*Vibemacs Transcript %s*"
+      (setq buffer (get-buffer-create (format "*vibemacs Transcript %s*"
                                               (vibemacs-worktrees--entry-name entry))))
       (puthash root buffer vibemacs-worktrees--transcript-buffers)
       (with-current-buffer buffer
@@ -1712,7 +1712,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
           (when buffer
             (vibemacs-worktrees--mark-buffer buffer)))))
     (vibemacs-worktrees--notify
-     "Vibemacs worktree"
+     "vibemacs worktree"
      (format "Codex produced a plan for %s" (vibemacs-worktrees--entry-name entry)))
     (let ((buffer (vibemacs-worktrees--activity-buffer)))
       (with-current-buffer buffer
@@ -1832,7 +1832,7 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
       (force-mode-line-update t))))
 
 (defun vibemacs-worktrees-show-activity ()
-  "Display the Vibemacs worktree activity log."
+  "Display the vibemacs worktree activity log."
   (interactive)
   (display-buffer (vibemacs-worktrees--activity-buffer)))
 
@@ -1930,7 +1930,7 @@ Interactively prompts for both when omitted."
           (magit-status (vibemacs-worktrees--entry-root entry)))))))
 
 (defun vibemacs-worktrees--apply-startup-layout (&optional force)
-  "Arrange the Vibemacs dashboard + chat layout.
+  "Arrange the vibemacs dashboard + chat layout.
 When FORCE is non-nil, rebuild the layout even if it already ran."
   (when (and vibemacs-worktrees-startup-layout
              (or force (not vibemacs-worktrees--startup-applied)))
@@ -1955,7 +1955,7 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
               (set-window-buffer root-window dashboard-buffer)
               (set-window-dedicated-p root-window t)
               (setq applied t)
-              (message "Vibemacs: frame too narrow for full layout; showing dashboard only."))
+              (message "vibemacs: frame too narrow for full layout; showing dashboard only."))
           (let* ((max-left (max min-left (- frame-width min-center)))
                  (auto-width (max min-left (min max-left (floor (* frame-width 0.25)))))
                  (desired (or vibemacs-worktrees-startup-left-width auto-width))
@@ -1987,7 +1987,7 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
               (condition-case err
                   (vibemacs-worktrees-center-show-chat entry)
                 (error
-                 (message "Vibemacs: unable to open chat console (%s)"
+                 (message "vibemacs: unable to open chat console (%s)"
                           (error-message-string err))))
               (vibemacs-worktrees--files-refresh entry nil))
             (setq applied t)
@@ -1996,14 +1996,14 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
         applied))))
 
 (defun vibemacs-worktrees-launch-home (&optional force)
-  "Launch the Vibemacs dashboard layout.
+  "Launch the vibemacs dashboard layout.
 With FORCE (interactive prefix), rebuild the layout even if it was already applied."
   (interactive "P")
   (when force
     (setq vibemacs-worktrees--startup-applied nil))
   (if vibemacs-worktrees-startup-layout
       (vibemacs-worktrees--apply-startup-layout force)
-    (message "Vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
+    (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
 
 (defun vibemacs-worktrees--ensure-vterm ()
   "Ensure vterm is available, signalling a helpful error otherwise."
@@ -2013,8 +2013,8 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
               (require 'vterm nil 'noerror)))
     (unless vibemacs-worktrees--has-vterm
       (if (fboundp 'module-load)
-          (user-error "Vibemacs requires the `vterm` package. Install it (M-x package-install RET vterm) and ensure it is compiled.")
-        (user-error "Vibemacs requires an Emacs built with dynamic modules to use vterm."))))
+          (user-error "vibemacs requires the `vterm` package. Install it (M-x package-install RET vterm) and ensure it is compiled.")
+        (user-error "vibemacs requires an Emacs built with dynamic modules to use vterm."))))
   vibemacs-worktrees--has-vterm)
 
 (provide 'worktrees)
