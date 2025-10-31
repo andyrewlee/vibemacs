@@ -146,6 +146,11 @@
   :type 'string
   :group 'vibemacs-worktrees)
 
+(defcustom vibemacs-worktrees-default-base "origin/main"
+  "Default base ref used when creating new worktrees."
+  :type 'string
+  :group 'vibemacs-worktrees)
+
 (defcustom vibemacs-worktrees-startup-frame-size '(160 . 52)
   "Width and height (in characters) to apply to the first vibemacs frame.
 Set to nil to keep the default frame size."
@@ -258,6 +263,26 @@ Signals an error if the command exits with non-zero."
     (when (string-empty-p ref)
       (user-error "Base ref required"))
     ref))
+
+(defun vibemacs-worktrees--current-repo ()
+  "Return the repository root for the current worktree context."
+  (let ((git-root (vibemacs-worktrees--git-root)))
+    (if git-root
+        (expand-file-name git-root)
+      (let* ((entries (ignore-errors (vibemacs-worktrees--entries-safe)))
+             (entry (and entries vibemacs-worktrees--active-root
+                         (cl-find vibemacs-worktrees--active-root entries
+                                  :test #'string=
+                                  :key #'vibemacs-worktrees--entry-root)))
+             (fallback (and entries (car entries)))
+             (repo (or (and entry (or (vibemacs-worktrees--entry-repo entry)
+                                      (vibemacs-worktrees--entry-root entry)))
+                       (and fallback (or (vibemacs-worktrees--entry-repo fallback)
+                                         (vibemacs-worktrees--entry-root fallback)))
+                       vibemacs-worktrees--active-root)))
+        (if repo
+            (expand-file-name repo)
+          (user-error "Unable to determine repository root"))))))
 
 (defun vibemacs-worktrees--load-registry ()
   "Return list of worktree structs from the registry file."
@@ -916,10 +941,10 @@ If ENTRY is nil prompt the user."
   "Create a new git worktree and register it."
   (interactive)
   (let ((use-dialog-box nil))
-    (let* ((repo (vibemacs-worktrees--read-repo))
+    (let* ((repo (vibemacs-worktrees--current-repo))
            (name (vibemacs-worktrees--read-worktree-name))
-           (base (vibemacs-worktrees--read-base-ref repo))
-           (branch (read-string "Branch name: " name nil name))
+           (branch name)
+           (base (or vibemacs-worktrees-default-base "origin/main"))
            (assistant-options (let ((options (mapcar (lambda (item)
                                                        (vibemacs-worktrees--normalize-assistant (car item)))
                                                      vibemacs-worktrees-chat-assistants)))
@@ -938,6 +963,8 @@ If ENTRY is nil prompt the user."
                          assistant-selection)))
            (target-path (vibemacs-worktrees--default-target-directory repo name))
            (target-arg (file-relative-name target-path repo)))
+      (when (or (not (stringp base)) (string-empty-p base))
+        (user-error "Base ref required"))
       (when (file-exists-p target-path)
         (user-error "Target %s already exists" target-path))
       (vibemacs-worktrees--call-git repo "worktree" "add" "-b" branch target-arg base)
