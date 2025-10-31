@@ -203,17 +203,15 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 
 (defun vibemacs-worktrees--default-target-directory (repo name)
   "Return the directory path where a new worktree NAME should live.
-Prefer placing worktrees alongside the current REPO's parent directory.
-Fallback to `vibemacs-worktrees-root' when the parent cannot be determined."
+The worktree will be placed under `vibemacs-worktrees-root', grouped by repository name."
+  (vibemacs-worktrees--ensure-root)
   (let* ((normalized (directory-file-name (expand-file-name repo)))
-         (parent (file-name-directory normalized)))
-    (cond
-     ((and parent
-           (not (string-empty-p parent)))
-      (expand-file-name name parent))
-     (t
-      (vibemacs-worktrees--ensure-root)
-      (expand-file-name name vibemacs-worktrees-root)))))
+         (repo-name (file-name-nondirectory normalized)))
+    (when (or (null repo-name) (string-empty-p repo-name))
+      (setq repo-name (substring (secure-hash 'sha1 normalized) 0 8)))
+    (let ((base (expand-file-name repo-name vibemacs-worktrees-root)))
+      (make-directory base t)
+      (expand-file-name name base))))
 
 (defun vibemacs-worktrees--call-git (repo &rest args)
   "Run git ARGS inside REPO and return trimmed output.
@@ -962,7 +960,10 @@ If ENTRY is nil prompt the user."
                            assistant-default
                          assistant-selection)))
            (target-path (vibemacs-worktrees--default-target-directory repo name))
+           (target-parent (file-name-directory (directory-file-name target-path)))
            (target-arg (file-relative-name target-path repo)))
+      (when (and target-parent (not (file-directory-p target-parent)))
+        (make-directory target-parent t))
       (when (or (not (stringp base)) (string-empty-p base))
         (user-error "Base ref required"))
       (when (file-exists-p target-path)
