@@ -75,7 +75,10 @@
   "Tooltip displayed when hovering dashboard worktree rows.")
 
 (defvar-local vibemacs-worktrees--chat-command-started nil
-  "Non-nil when the vibemacs chat console has already launched Codex.")
+  "Non-nil when the vibemacs chat console has already launched the assistant command.")
+
+(defvar-local vibemacs-worktrees--chat-program nil
+  "Command used to start the assistant in the current chat buffer.")
 
 (defvar-local vibemacs-worktrees--original-header-line nil
   "Previous header line saved before marking a buffer as Codex-touched.")
@@ -129,6 +132,19 @@
   (or (executable-find "codex") "codex")
   "Path to the Codex CLI executable."
   :type 'file)
+
+(defcustom vibemacs-worktrees-chat-assistants
+  '(("codex" . "codex")
+    ("claude" . "claude"))
+  "Mapping of assistant identifiers to commands launched in chat buffers."
+  :type '(repeat (cons (string :tag "Assistant")
+                       (string :tag "Command")))
+  :group 'vibemacs-worktrees)
+
+(defcustom vibemacs-worktrees-default-assistant "codex"
+  "Default assistant identifier for new worktrees."
+  :type 'string
+  :group 'vibemacs-worktrees)
 
 (defcustom vibemacs-worktrees-startup-frame-size '(160 . 52)
   "Width and height (in characters) to apply to the first vibemacs frame.
@@ -588,6 +604,8 @@ entry (or a synthesized one) in the head position."
     (repo . ,(vibemacs-worktrees--entry-repo entry))
     (base . ,(vibemacs-worktrees--entry-base entry))
     (created . ,(vibemacs-worktrees--entry-created entry))
+    (assistant . ,(vibemacs-worktrees--normalize-assistant
+                   vibemacs-worktrees-default-assistant))
     (scripts . ((setup . "")
                 (run . "")
                 (archive . "")))
@@ -610,15 +628,37 @@ entry (or a synthesized one) in the head position."
       (insert (json-encode metadata))
       (insert "\n"))))
 
+(defun vibemacs-worktrees--normalize-assistant (value)
+  "Normalize assistant VALUE to a non-empty string, falling back to default."
+  (cond
+   ((and (stringp value) (not (string-empty-p value))) value)
+   ((symbolp value) (symbol-name value))
+   (t vibemacs-worktrees-default-assistant)))
+
+(defun vibemacs-worktrees--assistant-command (assistant)
+  "Return the command associated with ASSISTANT identifier."
+  (let* ((identifier (vibemacs-worktrees--normalize-assistant assistant))
+         (match (cl-assoc identifier vibemacs-worktrees-chat-assistants :test #'string=)))
+    (if match (cdr match) identifier)))
+
+(defun vibemacs-worktrees--metadata-assistant (metadata)
+  "Return normalized assistant identifier stored in METADATA."
+  (let* ((raw (alist-get 'assistant metadata nil nil #'eq))
+         (normalized (vibemacs-worktrees--normalize-assistant raw)))
+    (setf (alist-get 'assistant metadata nil nil #'eq) normalized)
+    normalized))
+
 (defun vibemacs-worktrees--load-metadata (entry)
   "Return metadata alist for worktree ENTRY."
-  (let ((path (vibemacs-worktrees--metadata-path entry)))
-    (if (file-readable-p path)
-        (let ((json-object-type 'alist)
-              (json-array-type 'list)
-              (json-key-type 'symbol))
-          (json-read-file path))
-      (vibemacs-worktrees--default-metadata entry))))
+  (let* ((path (vibemacs-worktrees--metadata-path entry))
+         (metadata (if (file-readable-p path)
+                       (let ((json-object-type 'alist)
+                             (json-array-type 'list)
+                             (json-key-type 'symbol))
+                         (json-read-file path))
+                     (vibemacs-worktrees--default-metadata entry))))
+    (vibemacs-worktrees--metadata-assistant metadata)
+    metadata))
 
 (defun vibemacs-worktrees--ensure-port-base (entry metadata)
   "Ensure METADATA for ENTRY contains a port-base value and return it."
@@ -880,6 +920,22 @@ If ENTRY is nil prompt the user."
            (name (vibemacs-worktrees--read-worktree-name))
            (base (vibemacs-worktrees--read-base-ref repo))
            (branch (read-string "Branch name: " name nil name))
+           (assistant-options (let ((options (mapcar (lambda (item)
+                                                       (vibemacs-worktrees--normalize-assistant (car item)))
+                                                     vibemacs-worktrees-chat-assistants)))
+                                (if options options
+                                  (list (vibemacs-worktrees--normalize-assistant
+                                         vibemacs-worktrees-default-assistant)))))
+           (assistant-default (if (member vibemacs-worktrees-default-assistant assistant-options)
+                                  vibemacs-worktrees-default-assistant
+                                (car assistant-options)))
+           (assistant-selection (completing-read
+                                 (format "Assistant (%s): " assistant-default)
+                                 assistant-options nil t nil nil assistant-default))
+           (assistant (vibemacs-worktrees--normalize-assistant
+                       (if (string-empty-p assistant-selection)
+                           assistant-default
+                         assistant-selection)))
            (target-path (vibemacs-worktrees--default-target-directory repo name))
            (target-arg (file-relative-name target-path repo)))
       (when (file-exists-p target-path)
@@ -893,10 +949,11 @@ If ENTRY is nil prompt the user."
                      :base base
                      :created (vibemacs-worktrees--timestamp)))
              (env-source (expand-file-name ".env.local" repo))
-             (env-target (expand-file-name ".env.local" target-path)))
+             (env-target (expand-file-name ".env.local" target-path))
+             (metadata (vibemacs-worktrees--default-metadata entry)))
         (vibemacs-worktrees--register entry)
-        (vibemacs-worktrees--save-metadata entry
-                                           (vibemacs-worktrees--default-metadata entry))
+        (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
+        (vibemacs-worktrees--save-metadata entry metadata)
         (when (file-readable-p env-source)
           (condition-case err
               (progn
@@ -1070,26 +1127,26 @@ If ENTRY is nil prompt the user."
                        for root = (vibemacs-worktrees--entry-root entry)
                        for metadata = (vibemacs-worktrees--load-metadata entry)
                        for repo-path = (vibemacs-worktrees--entry-repo entry)
-			for active = (and vibemacs-worktrees--active-root
-					  (string= root vibemacs-worktrees--active-root))
-			for primary = (and repo-path
-					   (string=
-					    (directory-file-name (expand-file-name root))
-					    (directory-file-name (expand-file-name repo-path))))
-			for row-face = (when active 'vibemacs-worktrees-dashboard-active)
-			for tooltip = (when primary
-					"RET: activate main • Tabs switch panes • Codex/chat ready")
-			for name = (vibemacs-worktrees-dashboard--format-cell
-				    (vibemacs-worktrees--entry-name entry)
-				    row-face entry tooltip)
+            for active = (and vibemacs-worktrees--active-root
+                      (string= root vibemacs-worktrees--active-root))
+            for primary = (and repo-path
+                       (string=
+                        (directory-file-name (expand-file-name root))
+                        (directory-file-name (expand-file-name repo-path))))
+            for row-face = (when active 'vibemacs-worktrees-dashboard-active)
+            for tooltip = (when primary
+                    "RET: activate main • Tabs switch panes • Codex/chat ready")
+            for name = (vibemacs-worktrees-dashboard--format-cell
+                    (vibemacs-worktrees--entry-name entry)
+                    row-face entry tooltip)
         for branch = (format "%s <- %s"
                              (vibemacs-worktrees--entry-branch entry)
                              (vibemacs-worktrees--entry-base entry))
-			for status-info = (vibemacs-worktrees-dashboard--git-summary entry)
-			for dirty-count = (car status-info)
-			for status = (cdr status-info)
-			for branch-cell = (vibemacs-worktrees-dashboard--format-cell branch row-face)
-			for status-cell = (vibemacs-worktrees-dashboard--format-cell status row-face)
+            for status-info = (vibemacs-worktrees-dashboard--git-summary entry)
+            for dirty-count = (car status-info)
+            for status = (cdr status-info)
+            for branch-cell = (vibemacs-worktrees-dashboard--format-cell branch row-face)
+            for status-cell = (vibemacs-worktrees-dashboard--format-cell status row-face)
                        for codex = (vibemacs-worktrees-dashboard--codex-summary metadata)
                        for codex-cell = (vibemacs-worktrees-dashboard--format-cell codex row-face)
                        for running = (vibemacs-worktrees-dashboard--running-summary entry)
@@ -1324,26 +1381,26 @@ HELP overrides the default hover tooltip."
   (pop-to-buffer (vibemacs-worktrees-dashboard--setup-buffer)))
 
 (transient-define-prefix vibemacs-worktrees-dispatch ()
-			 "Top-level dispatcher for vibemacs worktree actions."
-			 ["Worktrees"
-			  ("n" "New worktree" vibemacs-worktrees-new)
-			  ("l" "List worktrees" vibemacs-worktrees-list)
-			  ("a" "Archive worktree" vibemacs-worktrees-archive)
-			  ("d" "Dashboard" vibemacs-worktrees-dashboard)
-			  ("V" "Review latest" vibemacs-worktrees-review-latest)]
-			 ["Scripts & Tools"
-			  ("s" "Run setup" vibemacs-worktrees-run-setup)
-			  ("r" "Run main" vibemacs-worktrees-run)
-			  ("f" "Run archive" vibemacs-worktrees-run-archive)
-			  ("c" "Choose script" vibemacs-worktrees-run-command)
-			  ("t" "Open terminal" vibemacs-worktrees-open-terminal)
-			  ("e" "Edit config" vibemacs-worktrees-edit-config)
-			  ("v" "View activity" vibemacs-worktrees-show-activity)
-			  ("C" "Clear markers" vibemacs-worktrees-clear-all-markers)]
-			 ["Codex"
-			  ("p" "Plan (Codex)" vibemacs-worktrees-codex-plan)
-			  ("A" "Plan + apply" vibemacs-worktrees-codex-apply)
-			  ("R" "Plan region" vibemacs-worktrees-codex-plan-region)])
+             "Top-level dispatcher for vibemacs worktree actions."
+             ["Worktrees"
+              ("n" "New worktree" vibemacs-worktrees-new)
+              ("l" "List worktrees" vibemacs-worktrees-list)
+              ("a" "Archive worktree" vibemacs-worktrees-archive)
+              ("d" "Dashboard" vibemacs-worktrees-dashboard)
+              ("V" "Review latest" vibemacs-worktrees-review-latest)]
+             ["Scripts & Tools"
+              ("s" "Run setup" vibemacs-worktrees-run-setup)
+              ("r" "Run main" vibemacs-worktrees-run)
+              ("f" "Run archive" vibemacs-worktrees-run-archive)
+              ("c" "Choose script" vibemacs-worktrees-run-command)
+              ("t" "Open terminal" vibemacs-worktrees-open-terminal)
+              ("e" "Edit config" vibemacs-worktrees-edit-config)
+              ("v" "View activity" vibemacs-worktrees-show-activity)
+              ("C" "Clear markers" vibemacs-worktrees-clear-all-markers)]
+             ["Codex"
+              ("p" "Plan (Codex)" vibemacs-worktrees-codex-plan)
+              ("A" "Plan + apply" vibemacs-worktrees-codex-apply)
+              ("R" "Plan region" vibemacs-worktrees-codex-plan-region)])
 
 (defun vibemacs-worktrees--capture-context (entry &optional extra limit)
   "Capture relevant context for ENTRY as a string.
@@ -1500,21 +1557,37 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
     buffer))
 
 (defun vibemacs-worktrees--chat-buffer (entry)
-  "Ensure the Codex chat console for ENTRY exists and return it."
+  "Ensure the assistant chat console for ENTRY exists and return it."
   (unless entry
     (user-error "Select a worktree to open the chat console"))
   (vibemacs-worktrees--ensure-vterm)
   (let* ((name (vibemacs-worktrees--entry-name entry))
          (root (vibemacs-worktrees--entry-root entry))
-         (buffer-name (format "*vibemacs Chat %s*" name)))
-    (vibemacs-worktrees--chat-buffer-vterm buffer-name root)))
+         (buffer-name (format "*vibemacs Chat %s*" name))
+         (metadata (vibemacs-worktrees--load-metadata entry))
+         (assistant (vibemacs-worktrees--metadata-assistant metadata))
+         (command (vibemacs-worktrees--assistant-command assistant)))
+    (when (or (null command) (string-empty-p command))
+      (user-error "No assistant command configured for %s" name))
+    (vibemacs-worktrees--chat-buffer-vterm buffer-name root command)))
 
-(defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root)
-  "Ensure a vterm chat buffer named BUFFER-NAME exists in ROOT."
+(defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root command)
+  "Ensure a vterm chat buffer named BUFFER-NAME exists in ROOT using COMMAND."
   (let ((buffer (get-buffer buffer-name)))
-    (when (and buffer (not (get-buffer-process buffer)))
-      (kill-buffer buffer)
-      (setq buffer nil))
+    (let ((needs-reset
+           (when (buffer-live-p buffer)
+             (let ((proc (get-buffer-process buffer)))
+               (or (not proc)
+                   (not (with-current-buffer buffer
+                          (equal vibemacs-worktrees--chat-program command))))))))
+      (when needs-reset
+        (let ((buf buffer))
+          (when (buffer-live-p buf)
+            (when-let ((proc (get-buffer-process buf)))
+              (when (process-live-p proc)
+                (kill-process proc)))
+            (kill-buffer buf)))
+        (setq buffer nil)))
     (unless buffer
       (let ((default-directory root)
             (vterm-buffer-name buffer-name)
@@ -1524,13 +1597,17 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
         (when buffer
           (with-current-buffer buffer
             (setq-local header-line-format nil)
-            (setq-local vibemacs-worktrees--chat-command-started nil)))))
+            (setq-local vibemacs-worktrees--chat-command-started nil)
+            (setq-local vibemacs-worktrees--chat-program command)))))
     (when buffer
       (with-current-buffer buffer
-        (unless (bound-and-true-p vibemacs-worktrees--chat-command-started)
-          (setq-local vibemacs-worktrees--chat-command-started t)
-          (vterm-send-string "codex")
-          (vterm-send-return))))
+        (setq-local vibemacs-worktrees--chat-program command)
+        (unless (and vibemacs-worktrees--chat-command-started
+                     (process-live-p (get-buffer-process buffer)))
+          (when-let ((proc (get-buffer-process buffer)))
+            (vterm-send-string command)
+            (vterm-send-return)
+            (setq-local vibemacs-worktrees--chat-command-started t)))))
     buffer))
 
 (defun vibemacs-worktrees--diff-buffer ()
@@ -1732,7 +1809,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
             (insert (format "  Files: %s\n" (string-join files ", "))))
           (insert "\n")))
       (vibemacs-worktrees--persist-codex-summary entry prompt result files (plist-get record :timestamp
-										      ))
+                                              ))
       (vibemacs-worktrees--transcript-append entry prompt result (plist-get record :timestamp) files)
       (vibemacs-worktrees--files-refresh entry files)
       (vibemacs-worktrees--display-review entry result))))
