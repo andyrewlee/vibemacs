@@ -116,6 +116,11 @@
   "File storing metadata about active vibemacs worktrees."
   :type 'file)
 
+(defcustom vibemacs-worktrees-setup-config-relpath ".vibemacs/worktrees.json"
+  "Relative path from a repository root to the JSON file describing worktree setup commands."
+  :type 'string
+  :group 'vibemacs-worktrees)
+
 (defcustom vibemacs-worktrees-open-terminal-on-create t
   "Open an interactive terminal for a new worktree immediately after creation."
   :type 'boolean)
@@ -622,6 +627,39 @@ entry (or a synthesized one) in the head position."
   (let* ((key (vibemacs-worktrees--metadata-key entry-or-root))
          (dir (expand-file-name key (vibemacs-worktrees--metadata-root))))
     (expand-file-name "worktree.json" dir)))
+
+(defun vibemacs-worktrees--setup-config-path (repo)
+  "Return absolute path to the repo-specific setup configuration file."
+  (when repo
+    (expand-file-name vibemacs-worktrees-setup-config-relpath repo)))
+
+(defun vibemacs-worktrees--load-setup-commands (repo)
+  "Return setup commands defined for REPO as a list of strings."
+  (let ((path (vibemacs-worktrees--setup-config-path repo)))
+    (when (and path (file-readable-p path))
+      (condition-case err
+          (let* ((json-object-type 'alist)
+                 (json-array-type 'list)
+                 (json-key-type 'symbol)
+                 (config (json-read-file path))
+                 (raw (vibemacs-worktrees--json-get config 'setup-worktree)))
+            (when (and raw (not (eq raw json-null)))
+              (let* ((items (cond
+                             ((listp raw) raw)
+                             ((vectorp raw) (append raw nil))
+                             ((stringp raw) (list raw))
+                             (t nil)))
+                     (commands (cl-loop for item in items
+                                        for candidate = (and (stringp item) (string-trim item))
+                                        when (and candidate (not (string-empty-p candidate)))
+                                        collect candidate)))
+                (when commands commands))))
+        (error
+         (message "vibemacs: failed to parse %s (%s)"
+                  (abbreviate-file-name path)
+                  (error-message-string err))
+         nil)))))
+
 (defun vibemacs-worktrees--default-metadata (entry)
   "Return default metadata alist for worktree ENTRY."
   `((name . ,(vibemacs-worktrees--entry-name entry))
@@ -977,9 +1015,40 @@ If ENTRY is nil prompt the user."
                      :created (vibemacs-worktrees--timestamp)))
              (env-source (expand-file-name ".env.local" repo))
              (env-target (expand-file-name ".env.local" target-path))
-             (metadata (vibemacs-worktrees--default-metadata entry)))
+             (metadata (vibemacs-worktrees--default-metadata entry))
+             (setup-commands (vibemacs-worktrees--load-setup-commands repo))
+             (setup-command-string (when setup-commands
+                                     (mapconcat #'identity setup-commands " && "))))
         (vibemacs-worktrees--register entry)
         (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
+        (when setup-command-string
+          (let ((scripts (vibemacs-worktrees--scripts metadata)))
+            (setf (alist-get 'setup scripts nil nil #'eq) setup-command-string)
+            (setf (alist-get 'scripts metadata nil nil #'eq) scripts))
+          (let ((env (copy-tree (alist-get 'env metadata))))
+            (dolist (pair `((ROOT_WORKTREE_PATH . ,(expand-file-name repo))
+                            (ROOT_REPO_PATH . ,(expand-file-name repo))
+                            (WORKTREE_PATH . ,(expand-file-name target-path))
+                            (NEW_WORKTREE_PATH . ,(expand-file-name target-path))
+                            (WORKTREE_NAME . ,name)
+                            (WORKTREE_BRANCH . ,branch)
+                            (WORKTREE_BASE . ,base)))
+              (setq env
+                    (cl-remove-if
+                     (lambda (item)
+                       (let* ((key (car item))
+                              (target (car pair))
+                              (normalized (cond
+                                           ((symbolp key) (intern (symbol-name key)))
+                                           ((stringp key) (intern (string-upcase key)))
+                                           (t key))))
+                         (or (eq key target)
+                             (eq normalized target)
+                             (and (stringp key)
+                                  (string= (string-upcase key) (symbol-name target))))))
+                     env))
+              (setq env (append env (list pair))))
+            (setf (alist-get 'env metadata nil nil #'eq) env)))
         (vibemacs-worktrees--save-metadata entry metadata)
         (when (file-readable-p env-source)
           (condition-case err
@@ -1006,7 +1075,14 @@ If ENTRY is nil prompt the user."
               (vibemacs-worktrees-open-terminal entry))
             (when (file-directory-p target-path)
               (dired target-path))))
-        (message "Worktree %s ready at %s" name target-path)
+        (message "Worktree %s ready at %s%s"
+                 name
+                 target-path
+                 (if setup-command-string
+                     " (running setup-worktree commands)"
+                   ""))
+        (when setup-command-string
+          (vibemacs-worktrees--run-script entry 'setup))
         entry))))
 
 ;;;###autoload
