@@ -106,13 +106,18 @@
   "Keyboard-first workflow for managing git worktrees with Codex CLI."
   :group 'tools)
 
+(defconst vibemacs-worktrees--default-home
+  (let ((home (or (getenv "VIBEMACS_HOME") "~/.vibemacs")))
+    (expand-file-name home))
+  "Default directory under which vibemacs stores persistent data.")
+
 (defcustom vibemacs-worktrees-root
-  (expand-file-name "worktrees" user-emacs-directory)
+  (expand-file-name "worktrees" vibemacs-worktrees--default-home)
   "Directory where new worktree checkouts are created."
   :type 'directory)
 
 (defcustom vibemacs-worktrees-registry
-  (expand-file-name "worktrees.json" user-emacs-directory)
+  (expand-file-name "worktrees.json" vibemacs-worktrees--default-home)
   "File storing metadata about active vibemacs worktrees."
   :type 'file)
 
@@ -360,6 +365,7 @@ Signals an error if the command exits with non-zero."
   (let ((json-encoding-pretty-print t)
         (json-object-type 'alist)
         (json-array-type 'list))
+    (make-directory (file-name-directory vibemacs-worktrees-registry) t)
     (with-temp-file vibemacs-worktrees-registry
       (insert
        (json-encode
@@ -601,7 +607,9 @@ entry (or a synthesized one) in the head position."
 
 (defun vibemacs-worktrees--metadata-root ()
   "Return the directory where vibemacs stores per-worktree metadata."
-  (expand-file-name "worktrees-metadata" user-emacs-directory))
+  (expand-file-name "worktrees-metadata"
+                    (file-name-directory
+                     (directory-file-name vibemacs-worktrees-root))))
 
 (defun vibemacs-worktrees--metadata-key (entry-or-root)
   "Return stable key for ENTRY-OR-ROOT to use in metadata filenames."
@@ -960,15 +968,14 @@ If ENTRY is nil prompt the user."
                            assistant-default
                          assistant-selection)))
            (target-path (vibemacs-worktrees--default-target-directory repo name))
-           (target-parent (file-name-directory (directory-file-name target-path)))
-           (target-arg (file-relative-name target-path repo)))
+           (target-parent (file-name-directory (directory-file-name target-path))))
       (when (and target-parent (not (file-directory-p target-parent)))
         (make-directory target-parent t))
       (when (or (not (stringp base)) (string-empty-p base))
         (user-error "Base ref required"))
       (when (file-exists-p target-path)
         (user-error "Target %s already exists" target-path))
-      (vibemacs-worktrees--call-git repo "worktree" "add" "-b" branch target-arg base)
+      (vibemacs-worktrees--call-git repo "worktree" "add" "-b" branch target-path base)
       (let* ((entry (vibemacs-worktrees--entry-create
                      :name name
                      :branch branch
