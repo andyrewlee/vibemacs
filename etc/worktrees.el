@@ -68,7 +68,7 @@
 
 (defface vibemacs-worktrees-dashboard-create
   '((t :inherit success :weight bold))
-  "Face used for the dashboard \"Create worktree\" row.")
+  "Face used for the dashboard \"+ Create\" row.")
 
 (defconst vibemacs-worktrees-dashboard--row-help
   "RET: activate • c: Codex plan • A: plan+apply • D: delete"
@@ -1176,7 +1176,7 @@ If ENTRY is nil prompt the user."
     (let ((inhibit-read-only t))
       (goto-char (point-max))
       (insert "\n  No worktrees yet.\n")
-      (insert "  • Click \"Create worktree\" below or press `n` to walk through the setup.\n")
+      (insert "  • Click \"+ Create\" below or press `n` to walk through the setup.\n")
       (insert "  • Once created, vibemacs will list each worktree here with status, Codex activity, and
              quick actions.\n")
       (insert "  • Use `SPC a w` for the dispatcher or the buttons in the welcome pane to get started.\
@@ -1197,9 +1197,9 @@ If ENTRY is nil prompt the user."
     (vibemacs-worktrees-dashboard--rebuild)))
 
 (defun vibemacs-worktrees-dashboard--create-row ()
-  "Return the synthetic \"Create worktree\" row for the dashboard."
+  "Return the synthetic \"+ Create\" row for the dashboard."
   (let ((label (vibemacs-worktrees-dashboard--format-cell
-                "＋ Create worktree"
+                "+ Create"
                 'vibemacs-worktrees-dashboard-create
                 nil
                 "Press RET to create a new worktree")))
