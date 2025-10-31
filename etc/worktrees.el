@@ -1529,7 +1529,7 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
       (with-current-buffer buffer
         (unless (bound-and-true-p vibemacs-worktrees--chat-command-started)
           (setq-local vibemacs-worktrees--chat-command-started t)
-          (vterm-send-string "codex --search --yolo")
+          (vterm-send-string "codex")
           (vterm-send-return))))
     buffer))
 
