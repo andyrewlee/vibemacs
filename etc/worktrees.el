@@ -140,7 +140,7 @@
 
 (defcustom vibemacs-worktrees-chat-assistants
   '(("codex" . "codex")
-    ("claude" . "claude"))
+    ("claude" . "claude --dangerously-skip-permissions"))
   "Mapping of assistant identifiers to commands launched in chat buffers."
   :type '(repeat (cons (string :tag "Assistant")
                        (string :tag "Command")))
