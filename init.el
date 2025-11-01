@@ -236,7 +236,7 @@ Returns non-nil on success, nil on failure."
         solarized-emphasize-indicators nil)
   :config
   (mapc #'disable-theme custom-enabled-themes)
-  (load-theme 'solarized-light :no-confirm))
+  (load-theme 'solarized-dark :no-confirm))
 
 ;;; terminal
 (use-package vterm
