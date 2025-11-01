@@ -995,6 +995,26 @@ If ENTRY is nil prompt the user."
                 (copy-file env-source env-target t)
                 (message "Copied .env.local → %s" (abbreviate-file-name env-target)))
             (error (message "Failed to copy .env.local: %s" (error-message-string err)))))
+        (let ((clerk-source (expand-file-name ".clerk" repo))
+              (clerk-target (expand-file-name ".clerk" target-path)))
+          (when (file-directory-p clerk-source)
+            (condition-case err
+                (progn
+                  (copy-directory clerk-source clerk-target nil t t)
+                  (message "Copied .clerk/ → %s" (abbreviate-file-name clerk-target)))
+              (error (message "Failed to copy .clerk/: %s" (error-message-string err))))))
+        (when (file-exists-p (expand-file-name "package.json" target-path))
+          (if-let ((pnpm-executable (executable-find "pnpm")))
+              (let ((default-directory target-path))
+                (condition-case err
+                    (progn
+                      (message "Running pnpm install in %s..." (abbreviate-file-name target-path))
+                      (let ((exit-code (call-process pnpm-executable nil nil nil "install")))
+                        (if (zerop exit-code)
+                            (message "pnpm install completed successfully")
+                          (message "pnpm install failed with exit code %d" exit-code))))
+                  (error (message "Failed to run pnpm install: %s" (error-message-string err)))))
+            (message "Skipping pnpm install: pnpm executable not found")))
         (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
                                   vibemacs-worktrees--center-window)))
           (vibemacs-worktrees-dashboard--activate entry)
