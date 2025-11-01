@@ -239,10 +239,17 @@ Returns non-nil on success, nil on failure."
   (load-theme 'solarized-dark :no-confirm))
 
 ;;; terminal
+(defun vibemacs-vterm-disable-evil ()
+  "Disable Evil locally in vterm buffers so terminal input passes through untouched."
+  (when (fboundp 'evil-local-mode)
+    (evil-local-mode -1)))
+
 (use-package vterm
   :commands (vterm)
   :init
-  (setq vterm-shell (or (getenv "SHELL") "/bin/zsh")))
+  (setq vterm-shell (or (getenv "SHELL") "/bin/zsh"))
+  :config
+  (add-hook 'vterm-mode-hook #'vibemacs-vterm-disable-evil t))
 
 (use-package multi-vterm
   :after vterm
