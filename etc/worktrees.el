@@ -1074,7 +1074,7 @@ If ENTRY is nil prompt the user."
       (tabulated-list-print t))
     (pop-to-buffer buffer)))
 
-(defvar vibemacs-worktrees-dashboard-buffer "*Worktrees Dashboard*"
+(defvar vibemacs-worktrees-dashboard-buffer "*vibemacs*"
   "Buffer name for the vibemacs dashboard.")
 
 (defvar vibemacs-worktrees-dashboard-mode-map
