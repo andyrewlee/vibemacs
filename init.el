@@ -145,6 +145,8 @@ Returns non-nil on success, nil on failure."
     "wl"   '(windmove-right                      :which-key "move to right rindow")
     "wh"   '(windmove-left                       :which-key "move to left window")
     "wj"   '(windmove-down                       :which-key "move to bottom window")
+    ;; view
+    "vt"   '(vibemacs-terminal-below             :which-key "terminal below")
     ;; buffer
     "be"   '(eval-buffer                         :which-key "eval buffer")
     "bn"   '(next-buffer                         :which-key "next buffer")
@@ -288,6 +290,23 @@ Returns non-nil on success, nil on failure."
 (defun vibemacs-zsh-config ()
   (interactive)
   (find-file "~/.zshrc"))
+
+;; terminal below with 80/20 split
+(defun vibemacs-terminal-below ()
+  "Open a new terminal session below the current window with an ~80/20 split."
+  (interactive)
+  (let* ((current-window (selected-window))
+         (total-height (window-total-height current-window))
+         (min-height (max window-min-height 1)))
+    (when (< total-height (* min-height 2))
+      (user-error "Window too short to split"))
+    (let* ((desired (max (floor (* total-height 0.2)) min-height))
+           (terminal-height (min desired (- total-height min-height))))
+      (unless (> terminal-height 0)
+        (user-error "Unable to allocate space for terminal"))
+      (let ((terminal-window (split-window current-window (- terminal-height))))
+        (select-window terminal-window)
+        (multi-vterm)))))
 
 ;; markdown polish
 (defun vibemacs-markdown-setup ()
