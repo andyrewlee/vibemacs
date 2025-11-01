@@ -15,6 +15,7 @@
 (declare-function vterm "vterm")
 (declare-function vterm-send-string "vterm")
 (declare-function vterm-send-return "vterm")
+(declare-function vterm-send-key "vterm")
 (declare-function diff-reject-hunk "diff-mode")
 (declare-function tabulated-list-goto-id "tabulated-list")
 (declare-function hl-line-highlight "hl-line")
@@ -85,6 +86,58 @@
 
 (defvar-local vibemacs-worktrees--plan-entry nil
   "Worktree entry associated with the current Codex review buffer.")
+
+(defun vibemacs-worktrees--chat-command-claude-p (command)
+  "Return non-nil when COMMAND appears to launch the Claude CLI."
+  (and (stringp command)
+       (string-match-p "\\bclaude\\b" command)))
+
+(defun vibemacs-worktrees--chat-send-escape ()
+  "Send an escape keypress to the current vterm buffer when available."
+  (when (and (derived-mode-p 'vterm-mode)
+             (fboundp 'vterm-send-string))
+    (vterm-send-string "\e")))
+
+(defun vibemacs-worktrees--chat-send-sigint ()
+  "Send C-c to the current vterm buffer when available."
+  (when (and (derived-mode-p 'vterm-mode)
+             (fboundp 'vterm-send-key))
+    (vterm-send-key "c" nil nil t)))
+
+(defun vibemacs-worktrees-chat-interrupt ()
+  "Interrupt the active vibemacs chat assistant process."
+  (interactive)
+  (if (not (derived-mode-p 'vterm-mode))
+      (keyboard-quit)
+    (let ((proc (get-buffer-process (current-buffer))))
+      (if (not (process-live-p proc))
+          (keyboard-quit)
+        (let ((command (or vibemacs-worktrees--chat-program "")))
+          (if (vibemacs-worktrees--chat-command-claude-p command)
+              (vibemacs-worktrees--chat-send-escape)
+            (vibemacs-worktrees--chat-send-sigint)))))))
+
+(defvar vibemacs-worktrees-chat-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<escape>") #'vibemacs-worktrees-chat-interrupt)
+    map)
+  "Keymap for `vibemacs-worktrees-chat-mode' buffers.")
+
+(define-minor-mode vibemacs-worktrees-chat-mode
+  "Minor mode enabling chat-specific keybindings for vibemacs terminals."
+  :lighter ""
+  :keymap vibemacs-worktrees-chat-mode-map
+  (when (fboundp 'evil-normalize-keymaps)
+    (evil-normalize-keymaps)))
+
+(with-eval-after-load 'evil
+  (when (fboundp 'evil-make-overriding-map)
+    (evil-make-overriding-map vibemacs-worktrees-chat-mode-map 'insert))
+  (when (fboundp 'evil-define-key)
+    (dolist (state '(insert normal visual motion))
+      (evil-define-key state vibemacs-worktrees-chat-mode-map
+        (kbd "<escape>") #'vibemacs-worktrees-chat-interrupt)))
+  (add-hook 'vibemacs-worktrees-chat-mode-hook #'evil-normalize-keymaps))
 
 (defvar vibemacs-worktrees-diff-mode-map
   (let ((map (make-sparse-keymap)))
@@ -1633,10 +1686,12 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
           (with-current-buffer buffer
             (setq-local header-line-format nil)
             (setq-local vibemacs-worktrees--chat-command-started nil)
-            (setq-local vibemacs-worktrees--chat-program command)))))
+            (setq-local vibemacs-worktrees--chat-program command)
+            (vibemacs-worktrees-chat-mode 1)))))
     (when buffer
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
+        (vibemacs-worktrees-chat-mode 1)
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
