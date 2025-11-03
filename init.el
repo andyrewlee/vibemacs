@@ -125,6 +125,7 @@ Returns non-nil on success, nil on failure."
     "an"   '(multi-vterm-next                     :which-key "next codex term")
     "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
     "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
+    "ve"   '(vibemacs-worktrees-chat-send-escape  :which-key "send ESC to chat")
     "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
     ;; git
     "g."   '(magit-dispatch                      :which-key "menu")

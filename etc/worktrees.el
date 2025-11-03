@@ -15,6 +15,8 @@
 (declare-function vterm "vterm")
 (declare-function vterm-send-string "vterm")
 (declare-function vterm-send-return "vterm")
+(declare-function vterm-send-key "vterm")
+(declare-function vterm-send-escape "vterm")
 (declare-function diff-reject-hunk "diff-mode")
 (declare-function tabulated-list-goto-id "tabulated-list")
 (declare-function hl-line-highlight "hl-line")
@@ -80,6 +82,9 @@
 (defvar-local vibemacs-worktrees--chat-program nil
   "Command used to start the assistant in the current chat buffer.")
 
+(defvar-local vibemacs-worktrees--chat-assistant nil
+  "Assistant identifier active in the current chat buffer.")
+
 (defvar-local vibemacs-worktrees--original-header-line nil
   "Previous header line saved before marking a buffer as Codex-touched.")
 
@@ -144,6 +149,12 @@
   "Mapping of assistant identifiers to commands launched in chat buffers."
   :type '(repeat (cons (string :tag "Assistant")
                        (string :tag "Command")))
+  :group 'vibemacs-worktrees)
+
+(defcustom vibemacs-worktrees-chat-interrupt-delay 0.2
+  "Delay in seconds between consecutive interrupts sent with `C-c'.
+When nil, interrupts are sent back-to-back with no delay."
+  :type '(choice (const :tag "No delay" nil) number)
   :group 'vibemacs-worktrees)
 
 (defcustom vibemacs-worktrees-default-assistant "codex"
@@ -1604,17 +1615,19 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
          (command (vibemacs-worktrees--assistant-command assistant)))
     (when (or (null command) (string-empty-p command))
       (user-error "No assistant command configured for %s" name))
-    (vibemacs-worktrees--chat-buffer-vterm buffer-name root command)))
+    (vibemacs-worktrees--chat-buffer-vterm buffer-name root command assistant)))
 
-(defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root command)
-  "Ensure a vterm chat buffer named BUFFER-NAME exists in ROOT using COMMAND."
+(defun vibemacs-worktrees--chat-buffer-vterm (buffer-name root command assistant)
+  "Ensure a vterm chat buffer named BUFFER-NAME exists in ROOT using COMMAND.
+ASSISTANT is the identifier configured for the chat session."
   (let ((buffer (get-buffer buffer-name)))
     (let ((needs-reset
            (when (buffer-live-p buffer)
              (let ((proc (get-buffer-process buffer)))
                (or (not proc)
                    (not (with-current-buffer buffer
-                          (equal vibemacs-worktrees--chat-program command))))))))
+                          (and (equal vibemacs-worktrees--chat-program command)
+                               (equal vibemacs-worktrees--chat-assistant assistant)))))))))
       (when needs-reset
         (let ((buf buffer))
           (when (buffer-live-p buf)
@@ -1633,10 +1646,12 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
           (with-current-buffer buffer
             (setq-local header-line-format nil)
             (setq-local vibemacs-worktrees--chat-command-started nil)
-            (setq-local vibemacs-worktrees--chat-program command)))))
+            (setq-local vibemacs-worktrees--chat-program command)
+            (setq-local vibemacs-worktrees--chat-assistant assistant)))))
     (when buffer
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
+        (setq-local vibemacs-worktrees--chat-assistant assistant)
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
@@ -1644,6 +1659,41 @@ EXTRA-CONTEXT, when non-nil, is appended to the captured context block."
             (vterm-send-return)
             (setq-local vibemacs-worktrees--chat-command-started t)))))
     buffer))
+
+(defun vibemacs-worktrees-chat-send-interrupt ()
+  "Send one or more C-c interrupts to the active chat assistant."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "Chat interrupts are only available in vterm buffers"))
+  (let* ((count (if current-prefix-arg
+                    (max 1 (prefix-numeric-value current-prefix-arg))
+                  (if (and (boundp 'vibemacs-worktrees--chat-assistant)
+                           (string= vibemacs-worktrees--chat-assistant "claude"))
+                      2
+                    1))))
+    (let ((buffer (current-buffer))
+          (delay vibemacs-worktrees-chat-interrupt-delay))
+      (cl-labels ((chat-send (remaining)
+                   (when (and (buffer-live-p buffer) (> remaining 0))
+                     (with-current-buffer buffer
+                       (vterm-send-key "c" nil nil t))
+                     (when (> remaining 1)
+                       (if delay
+                           (run-at-time delay nil
+                                        (lambda ()
+                                          (chat-send (1- remaining))))
+                         (chat-send (1- remaining)))))))
+        (chat-send count)))))
+
+(defun vibemacs-worktrees-chat-send-escape ()
+  "Send `<escape>' to the active chat buffer."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "Chat escape is only available in vterm buffers"))
+  (vterm-send-escape))
+
+(with-eval-after-load 'vterm
+  (define-key vterm-mode-map (kbd "C-c C-c") #'vibemacs-worktrees-chat-send-interrupt))
 
 (defun vibemacs-worktrees--diff-buffer ()
   "Return the diff review buffer."
