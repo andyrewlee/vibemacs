@@ -1006,6 +1006,28 @@ If ENTRY is nil prompt the user."
                 (copy-file env-source env-target t)
                 (message "Copied .env.local → %s" (abbreviate-file-name env-target)))
             (error (message "Failed to copy .env.local: %s" (error-message-string err)))))
+        ;; Copy .clerk directory if it exists
+        (let ((clerk-source (expand-file-name ".clerk" repo))
+              (clerk-target (expand-file-name ".clerk" target-path)))
+          (when (file-directory-p clerk-source)
+            (condition-case err
+                (progn
+                  (copy-directory clerk-source clerk-target t t t)
+                  (message "Copied .clerk → %s" (abbreviate-file-name clerk-target)))
+              (error (message "Failed to copy .clerk: %s" (error-message-string err))))))
+        ;; Run pnpm install in the background
+        (let ((default-directory target-path))
+          (make-process
+           :name (format "pnpm-install-%s" name)
+           :buffer (generate-new-buffer (format "*pnpm-install-%s*" name))
+           :command '("pnpm" "install")
+           :sentinel (lambda (proc event)
+                       (when (string-match-p "finished\\|exited" event)
+                         (if (zerop (process-exit-status proc))
+                             (message "pnpm install completed for worktree %s" name)
+                           (message "pnpm install failed for worktree %s (see %s)"
+                                    name (buffer-name (process-buffer proc))))))
+           :noquery t))
         (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
                                   vibemacs-worktrees--center-window)))
           (vibemacs-worktrees-dashboard--activate entry)
