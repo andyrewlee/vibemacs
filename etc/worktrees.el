@@ -953,6 +953,56 @@ If ENTRY is nil prompt the user."
       (vibemacs-worktrees--save-metadata entry
                                          (vibemacs-worktrees--default-metadata entry)))
     (find-file path)))
+
+(defun vibemacs-worktrees--read-setup-config (repo)
+  "Read and parse .vibemacs/worktrees.json from REPO.
+Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid."
+  (let ((config-path (expand-file-name ".vibemacs/worktrees.json" repo)))
+    (when (file-readable-p config-path)
+      (condition-case err
+          (with-temp-buffer
+            (insert-file-contents config-path)
+            (goto-char (point-min))
+            (json-parse-buffer :object-type 'alist :array-type 'list))
+        (error
+         (message "Failed to parse %s: %s" config-path (error-message-string err))
+         nil)))))
+
+(defun vibemacs-worktrees--run-setup-commands (repo target-path name)
+  "Run setup commands from .vibemacs/worktrees.json config.
+REPO is the root worktree path, TARGET-PATH is the new worktree path,
+and NAME is the worktree name."
+  (let* ((config (vibemacs-worktrees--read-setup-config repo))
+         (commands (when config (alist-get 'setup-worktree config))))
+    (if (and commands (listp commands))
+        (let ((default-directory target-path)
+              (process-environment (copy-sequence process-environment)))
+          ;; Set ROOT_WORKTREE_PATH environment variable
+          (setenv "ROOT_WORKTREE_PATH" repo)
+          (message "Running setup commands for worktree %s..." name)
+          ;; Execute commands sequentially
+          (dolist (cmd commands)
+            (when (stringp cmd)
+              (let* ((expanded-cmd (replace-regexp-in-string
+                                    "\\$ROOT_WORKTREE_PATH"
+                                    repo
+                                    cmd))
+                     (proc (start-process-shell-command
+                            (format "setup-%s" name)
+                            (generate-new-buffer (format "*worktree-setup-%s*" name))
+                            expanded-cmd)))
+                (set-process-sentinel
+                 proc
+                 (lambda (process event)
+                   (when (string-match-p "finished\\|exited" event)
+                     (if (zerop (process-exit-status process))
+                         (message "Setup command completed: %s" expanded-cmd)
+                       (message "Setup command failed: %s (see %s)"
+                                expanded-cmd
+                                (buffer-name (process-buffer process)))))))
+                (message "Executing: %s" expanded-cmd)))))
+      (message "No setup-worktree commands found in .vibemacs/worktrees.json"))))
+
 ;;;###autoload
 (defun vibemacs-worktrees-new ()
   "Create a new git worktree and register it."
@@ -994,40 +1044,12 @@ If ENTRY is nil prompt the user."
                      :root target-path
                      :base base
                      :created (vibemacs-worktrees--timestamp)))
-             (env-source (expand-file-name ".env.local" repo))
-             (env-target (expand-file-name ".env.local" target-path))
              (metadata (vibemacs-worktrees--default-metadata entry)))
         (vibemacs-worktrees--register entry)
         (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
         (vibemacs-worktrees--save-metadata entry metadata)
-        (when (file-readable-p env-source)
-          (condition-case err
-              (progn
-                (copy-file env-source env-target t)
-                (message "Copied .env.local → %s" (abbreviate-file-name env-target)))
-            (error (message "Failed to copy .env.local: %s" (error-message-string err)))))
-        ;; Copy .clerk directory if it exists
-        (let ((clerk-source (expand-file-name ".clerk" repo))
-              (clerk-target (expand-file-name ".clerk" target-path)))
-          (when (file-directory-p clerk-source)
-            (condition-case err
-                (progn
-                  (copy-directory clerk-source clerk-target t t t)
-                  (message "Copied .clerk → %s" (abbreviate-file-name clerk-target)))
-              (error (message "Failed to copy .clerk: %s" (error-message-string err))))))
-        ;; Run pnpm install in the background
-        (let ((default-directory target-path))
-          (make-process
-           :name (format "pnpm-install-%s" name)
-           :buffer (generate-new-buffer (format "*pnpm-install-%s*" name))
-           :command '("pnpm" "install")
-           :sentinel (lambda (proc event)
-                       (when (string-match-p "finished\\|exited" event)
-                         (if (zerop (process-exit-status proc))
-                             (message "pnpm install completed for worktree %s" name)
-                           (message "pnpm install failed for worktree %s (see %s)"
-                                    name (buffer-name (process-buffer proc))))))
-           :noquery t))
+        ;; Run setup commands from .vibemacs/worktrees.json
+        (vibemacs-worktrees--run-setup-commands repo target-path name)
         (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
                                   vibemacs-worktrees--center-window)))
           (vibemacs-worktrees-dashboard--activate entry)
