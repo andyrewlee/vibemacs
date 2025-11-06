@@ -2319,30 +2319,22 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
 
                  ;; Only split right if we have enough space
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
+                 (right-window nil))  ;; Initialize right-window
 
-                 ;; Store old center before split
-                 (old-center center-window)
+            ;; Do the right split OUTSIDE of let* so we can update center-window
+            (when can-split-right
+              (let* ((old-center center-window)
+                     (new-right (split-window center-window (- right-width) 'right)))
+                ;; Check which window is smaller to handle any quirks
+                (if (< (window-total-width new-right) (window-total-width old-center))
+                    ;; Normal case: new-right is small (sidebar), old-center is large (content)
+                    (setq right-window new-right
+                          center-window old-center)
+                  ;; Reversed: new-right is large, old-center is small
+                  (setq right-window old-center
+                        center-window new-right))))
 
-                 ;; Split right and handle window assignment
-                 (new-right (when can-split-right
-                              (split-window center-window (- right-width) 'right)))
-
-                 ;; After right split, verify which window is which based on size
-                 ;; The center should be larger than the right sidebar
-                 (right-window (when new-right
-                                 (if (< (window-total-width new-right)
-                                        (window-total-width old-center))
-                                     new-right
-                                   old-center)))
-
-                 ;; Update center-window to point to the actual center (not the right sidebar)
-                 (center-window (if (and new-right right-window)
-                                    (if (eq right-window new-right)
-                                        old-center
-                                      new-right)
-                                  center-window))
-
-                 (entries (vibemacs-worktrees--entries-safe))
+            (let* ((entries (vibemacs-worktrees--entries-safe))
                  (entry (or (cl-find vibemacs-worktrees--active-root entries
                                      :key #'vibemacs-worktrees--entry-root
                                      :test #'string=)
