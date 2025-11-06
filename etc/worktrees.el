@@ -2302,6 +2302,7 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
 
                  ;; Now get actual center width after left split
                  (actual-center-width (window-total-width center-window))
+                 (actual-left-width (window-total-width left-window))
                  (max-right (max 0 (- actual-center-width min-center)))
                  (auto-right (max min-right (min max-right (floor (* frame-width 0.15)))))
                  (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
@@ -2316,6 +2317,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                                      :key #'vibemacs-worktrees--entry-root
                                      :test #'string=)
                             (car entries))))
+
+            ;; Debug output
+            (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d can-split-right=%s"
+                     frame-width left-width actual-left-width actual-center-width right-width can-split-right)
 
             ;; Setup left (dashboard)
             (set-window-buffer left-window dashboard-buffer)
