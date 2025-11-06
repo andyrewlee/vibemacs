@@ -2298,11 +2298,20 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (left-width (max min-left (min max-left desired-left)))
 
                  ;; Split left: creates new window on left, returns it
-                 (new-left (split-window root-window left-width 'left))
-                 ;; Just use straightforward assignment - the split creates correct sizes
-                 ;; new-left should be small (24), root-window should be large (138)
-                 (left-window new-left)
-                 (center-window root-window)
+                 (new-left (split-window root-window left-width 'left)))
+
+            ;; Debug: check what split-window actually returned
+            (message "  After left split: new-left width=%d root width=%d"
+                     (window-total-width new-left)
+                     (window-total-width root-window))
+
+            (let* (;; Assign based on which is actually small
+                 (left-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                  new-left
+                                root-window))
+                 (center-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                    root-window
+                                  new-left))
 
                  ;; Now get actual center width after left split
                  (actual-center-width (window-total-width center-window))
