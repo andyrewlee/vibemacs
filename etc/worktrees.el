@@ -2384,7 +2384,7 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                   (when right-window
                     (vibemacs-worktrees-git-status--populate entry)))
                 (setq applied t)
-                (select-window center-window))))
+                (select-window center-window)))))
 
          ;; Two-column layout: left (dashboard) + center (chat), no right sidebar
          ((>= frame-width min-two-column)
