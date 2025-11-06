@@ -1020,7 +1020,9 @@ and NAME is the worktree name."
   (message "[worktrees] Root worktree: %s" repo)
   (message "[worktrees] Target path: %s" target-path)
   (let* ((config (vibemacs-worktrees--read-setup-config repo))
-         (commands (when config (alist-get 'setup-worktree config))))
+         (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
+    (when config
+      (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
     (if (and commands (listp commands) (> (length commands) 0))
         (progn
           (message "[worktrees] Found %d setup command(s)" (length commands))
