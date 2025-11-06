@@ -2298,14 +2298,14 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (left-width (max min-left (min max-left desired-left)))
 
                  ;; Split left: creates new window on left, returns it
-                 ;; The returned window should be small (left sidebar)
-                 ;; The original root-window becomes the large center/right area
                  (new-left (split-window root-window left-width 'left))
-                 ;; Assign based on actual sizes to handle any quirks
-                 (left-window (if (< (window-total-width new-left) (window-total-width root-window))
+                 ;; Assign based on physical position (column), not size
+                 ;; The window at column 0 is physically LEFT (should be small sidebar)
+                 ;; The window at higher column is physically RIGHT (should be larger center)
+                 (left-window (if (< (window-left-column new-left) (window-left-column root-window))
                                   new-left
                                 root-window))
-                 (center-window (if (< (window-total-width new-left) (window-total-width root-window))
+                 (center-window (if (< (window-left-column new-left) (window-left-column root-window))
                                     root-window
                                   new-left))
 
@@ -2325,14 +2325,16 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (when can-split-right
               (let* ((old-center center-window)
                      (new-right (split-window center-window (- right-width) 'right)))
-                ;; Check which window is smaller to handle any quirks
-                (if (< (window-total-width new-right) (window-total-width old-center))
-                    ;; Normal case: new-right is small (sidebar), old-center is large (content)
-                    (setq right-window new-right
-                          center-window old-center)
-                  ;; Reversed: new-right is large, old-center is small
-                  (setq right-window old-center
-                        center-window new-right))))
+                ;; Assign based on physical position (column), not size
+                ;; After this split, we have left (small), center (large), and right (small)
+                ;; old-center and new-right: whichever is at the higher column is physically RIGHT
+                (if (< (window-left-column new-right) (window-left-column old-center))
+                    ;; new-right has lower column, so it's actually in the middle, old-center moved right
+                    (setq center-window new-right
+                          right-window old-center)
+                  ;; new-right has higher column, so it's on the right, old-center stays middle
+                  (setq center-window old-center
+                        right-window new-right))))
 
             (let ((entries (vibemacs-worktrees--entries-safe)))
               (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
@@ -2351,51 +2353,49 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                          (window-left-column center-window)
                          (when right-window (window-left-column right-window)))
 
-                ;; Based on column positions from debug:
-                ;; center-window at col 0 (physical LEFT) → dashboard
-                ;; right-window at col 114 (physical MIDDLE) → chat
-                ;; left-window at col 138 (physical RIGHT) → git status
+                ;; Now window variables should match physical positions correctly
+                ;; left-window = physical left (dashboard)
+                ;; center-window = physical center (chat)
+                ;; right-window = physical right (git status)
 
-                ;; Physical LEFT: dashboard (center-window var)
-                (set-window-buffer center-window dashboard-buffer)
-                (set-window-dedicated-p center-window t)
-                (set-window-parameter center-window 'window-size-fixed 'width)
-                (set-window-parameter center-window 'no-delete-other-windows t)
-                (set-window-parameter center-window 'window-preserved-size (cons 'width left-width))
+                ;; Setup left (dashboard)
+                (set-window-buffer left-window dashboard-buffer)
+                (set-window-dedicated-p left-window t)
+                (set-window-parameter left-window 'window-size-fixed 'width)
+                (set-window-parameter left-window 'no-delete-other-windows t)
+                (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
 
-                ;; Physical RIGHT: git status (left-window var)
+                ;; Setup right (git status)
                 (when right-window
-                  (set-window-buffer left-window git-status-buffer)
-                  (set-window-dedicated-p left-window t)
-                  (set-window-parameter left-window 'window-size-fixed 'width)
-                  (set-window-parameter left-window 'no-delete-other-windows t)
-                  (set-window-parameter left-window 'window-preserved-size (cons 'width right-width)))
+                  (set-window-buffer right-window git-status-buffer)
+                  (set-window-dedicated-p right-window t)
+                  (set-window-parameter right-window 'window-size-fixed 'width)
+                  (set-window-parameter right-window 'no-delete-other-windows t)
+                  (set-window-parameter right-window 'window-preserved-size (cons 'width right-width)))
 
-                ;; Store references: right-window (physical middle) is center
-                (setq vibemacs-worktrees--center-window right-window)
-                (setq vibemacs-worktrees--right-window left-window)
+                ;; Store references
+                (setq vibemacs-worktrees--center-window center-window)
+                (setq vibemacs-worktrees--right-window right-window)
 
                 (when entry
                   (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
                   (vibemacs-worktrees-dashboard--activate entry)
-                  ;; Dashboard is in center-window var (physical left)
-                  (with-selected-window center-window
+                  (with-selected-window left-window
                     (goto-char (point-min))
                     (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
                     (when (bound-and-true-p hl-line-mode)
                       (hl-line-highlight)))
-                  ;; Select chat window (right-window var, physical middle)
-                  (select-window right-window)
+                  (select-window center-window)
                   (condition-case err
                       (vibemacs-worktrees-center-show-chat entry)
                     (error
                      (message "vibemacs: unable to open chat console (%s)"
                               (error-message-string err))))
                   (vibemacs-worktrees--files-refresh entry nil)
-                  (when left-window
+                  (when right-window
                     (vibemacs-worktrees-git-status--populate entry)))
                 (setq applied t)
-                (select-window right-window)))))
+                (select-window center-window)))))
 
          ;; Two-column layout: left (dashboard) + center (chat), no right sidebar
          ((>= frame-width min-two-column)
