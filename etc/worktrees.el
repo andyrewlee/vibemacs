@@ -43,6 +43,9 @@
 (defvar vibemacs-worktrees--center-window nil
   "Window used for the central chat/terminal pane.")
 
+(defvar vibemacs-worktrees--right-window nil
+  "Window used for the right sidebar showing git status.")
+
 (defvar vibemacs-worktrees--transcript-buffers (make-hash-table :test 'equal)
   "Hash table mapping worktree roots to transcript buffers.")
 
@@ -181,6 +184,12 @@ Set to nil to keep the default frame size."
 
 (defcustom vibemacs-worktrees-startup-left-width 24
   "Preferred width in columns for the dashboard pane at startup.
+When nil, derive the width from the frame size."
+  :type '(choice (const :tag "Automatic" nil)
+                 (integer :tag "Columns")))
+
+(defcustom vibemacs-worktrees-startup-right-width 24
+  "Preferred width in columns for the git status sidebar at startup.
 When nil, derive the width from the frame size."
   :type '(choice (const :tag "Automatic" nil)
                  (integer :tag "Columns")))
@@ -1317,6 +1326,89 @@ and NAME is the worktree name."
       (vibemacs-worktrees-dashboard--rebuild))
     buffer))
 
+;;; Right sidebar (git status)
+
+(defvar vibemacs-worktrees-git-status-buffer "*vibemacs-git*"
+  "Buffer name for the vibemacs git status sidebar.")
+
+(defvar vibemacs-worktrees-git-status-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map special-mode-map)
+    (define-key map (kbd "RET") #'vibemacs-worktrees-git-status-open-file)
+    (define-key map (kbd "g") #'vibemacs-worktrees-git-status-refresh)
+    map)
+  "Keymap for `vibemacs-worktrees-git-status-mode'.")
+
+(define-derived-mode vibemacs-worktrees-git-status-mode special-mode "Git-Status"
+  "Sidebar view showing git status for the active worktree."
+  (setq truncate-lines t)
+  (hl-line-mode 1))
+
+(eval-after-load 'evil
+  '(when (fboundp 'evil-define-key)
+     (dolist (state '(normal motion))
+       (evil-define-key state vibemacs-worktrees-git-status-mode-map
+         (kbd "RET") #'vibemacs-worktrees-git-status-open-file
+         (kbd "g") #'vibemacs-worktrees-git-status-refresh))))
+
+(defun vibemacs-worktrees-git-status--setup-buffer ()
+  "Ensure the git status sidebar buffer exists, returning it."
+  (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
+    (with-current-buffer buffer
+      (vibemacs-worktrees-git-status-mode))
+    buffer))
+
+(defun vibemacs-worktrees-git-status-open-file ()
+  "Open the file at point in the center window."
+  (interactive)
+  (when-let* ((entry (vibemacs-worktrees-center--current-entry))
+              (root (vibemacs-worktrees--entry-root entry))
+              (file (get-text-property (point) 'vibemacs-file-path)))
+    (when (and file (window-live-p vibemacs-worktrees--center-window))
+      (with-selected-window vibemacs-worktrees--center-window
+        (find-file (expand-file-name file root))))))
+
+(defun vibemacs-worktrees-git-status-refresh ()
+  "Refresh the git status sidebar for the current worktree."
+  (interactive)
+  (when-let ((entry (vibemacs-worktrees-center--current-entry)))
+    (vibemacs-worktrees-git-status--populate entry)))
+
+(defun vibemacs-worktrees-git-status--populate (entry)
+  "Populate the git status sidebar with changed files for ENTRY."
+  (let* ((status-list (vibemacs-worktrees--status-files entry))
+         (buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
+    (with-current-buffer buffer
+      (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
+        (vibemacs-worktrees-git-status-mode))
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (propertize "Git Status\n" 'face 'bold))
+        (insert (propertize (format "%s\n" (vibemacs-worktrees--entry-name entry))
+                            'face 'font-lock-comment-face))
+        (insert (propertize "──────────────────────\n" 'face 'shadow))
+        (if status-list
+            (dolist (status status-list)
+              (pcase-let ((`(,code . ,path) status))
+                (let ((status-face (cond
+                                    ((string-match-p "^M" code) 'font-lock-warning-face)
+                                    ((string-match-p "^A" code) 'success)
+                                    ((string-match-p "^D" code) 'error)
+                                    ((string-match-p "^\\?\\?" code) 'font-lock-comment-face)
+                                    (t 'default))))
+                  (insert (propertize (format "%-3s" (if (> (length code) 0) code "??"))
+                                      'face status-face))
+                  (insert (propertize path
+                                      'face 'default
+                                      'vibemacs-file-path path
+                                      'mouse-face 'highlight
+                                      'help-echo "RET to open file"))
+                  (insert "\n"))))
+          (insert (propertize "Working tree clean\n" 'face 'success)))
+        (goto-char (point-min))
+        (forward-line 3)))
+    buffer))
+
 
 (defun vibemacs-worktrees-dashboard--maybe-refresh ()
   "Refresh the dashboard if the current buffer uses the dashboard mode."
@@ -2188,23 +2280,131 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
       (delete-other-windows)
       (let* ((root-window (selected-window))
              (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
+             (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
              (frame-width (window-total-width root-window))
              (min-left 20)
-             (min-center 80)
-             (can-split (> frame-width (+ min-left min-center))))
-        (if (not can-split)
-            (progn
-              (setq vibemacs-worktrees--center-window nil)
-              (set-window-buffer root-window dashboard-buffer)
-              (set-window-dedicated-p root-window t)
-              (setq applied t)
-              (message "vibemacs: frame too narrow for full layout; showing dashboard only."))
+             (min-right 20)
+             (min-center 60)
+             (min-two-column (+ min-left min-center))
+             (min-three-column (+ min-left min-center min-right)))
+        (cond
+         ;; Three-column layout: left (dashboard) + center (chat) + right (git status)
+         ((>= frame-width min-three-column)
+          (let* (;; Calculate widths ensuring minimum space for center
+                 (available-for-sides (- frame-width min-center))
+                 (max-left (floor (* available-for-sides 0.5)))
+                 (auto-left (max min-left (min max-left (floor (* frame-width 0.15)))))
+                 (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
+                 (left-width (max min-left (min max-left desired-left)))
+
+                 ;; Split left: creates new window on left, returns it
+                 (new-left (split-window root-window left-width 'left))
+
+                 ;; Assign based on which is actually small
+                 (left-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                  new-left
+                                root-window))
+                 (center-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                    root-window
+                                  new-left))
+
+                 ;; Now get actual center width after left split
+                 (actual-center-width (window-total-width center-window))
+                 (actual-left-width (window-total-width left-window))
+                 (max-right (max 0 (- actual-center-width min-center)))
+                 (auto-right (max min-right (min max-right (floor (* frame-width 0.15)))))
+                 (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
+                 (right-width (max min-right (min max-right desired-right)))
+
+                 ;; Only split right if we have enough space
+                 (can-split-right (>= actual-center-width (+ min-center min-right)))
+                 (right-window nil))  ;; Initialize right-window
+
+            ;; Do the right split - straightforward assignment
+            (when can-split-right
+              (setq right-window (split-window center-window (- right-width) 'right))
+              ;; center-window stays as is (the original window on the left of the split)
+              )
+
+            (let ((entries (vibemacs-worktrees--entries-safe)))
+              (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
+                                        :key #'vibemacs-worktrees--entry-root
+                                        :test #'string=)
+                               (car entries))))
+
+                ;; Debug output with physical positions
+                (message "  After left split: new-left width=%d root width=%d"
+                         (window-total-width new-left)
+                         (window-total-width root-window))
+                (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d right-actual=%s can-split-right=%s"
+                         frame-width left-width actual-left-width
+                         (window-total-width center-window) right-width
+                         (when right-window (window-total-width right-window))
+                         can-split-right)
+                (message "  Physical positions: left-col=%d center-col=%d right-col=%s"
+                         (window-left-column left-window)
+                         (window-left-column center-window)
+                         (when right-window (window-left-column right-window)))
+
+                ;; Assign buffers based on PHYSICAL positions (columns):
+                ;; center-window at col 0 (LEFT) → dashboard
+                ;; right-window at col 114 (MIDDLE) → chat
+                ;; left-window at col 138 (RIGHT) → git status
+
+                ;; Physical LEFT: dashboard (center-window)
+                (set-window-buffer center-window dashboard-buffer)
+                ;; Resize center-window to the correct width for dashboard
+                (let ((delta (- left-width (window-total-width center-window))))
+                  (when (/= delta 0)
+                    (window-resize center-window delta t)))
+                (set-window-dedicated-p center-window t)
+                (set-window-parameter center-window 'window-size-fixed 'width)
+                (set-window-parameter center-window 'no-delete-other-windows t)
+                (set-window-parameter center-window 'window-preserved-size (cons 'width left-width))
+
+                ;; Physical RIGHT: git status (left-window)
+                (when right-window
+                  (set-window-buffer left-window git-status-buffer)
+                  (set-window-dedicated-p left-window t)
+                  (set-window-parameter left-window 'window-size-fixed 'width)
+                  (set-window-parameter left-window 'no-delete-other-windows t)
+                  (set-window-parameter left-window 'window-preserved-size (cons 'width right-width)))
+
+                ;; Store references (physical MIDDLE is the center pane)
+                (setq vibemacs-worktrees--center-window right-window)
+                (setq vibemacs-worktrees--right-window left-window)
+
+                (when entry
+                  (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
+                  (vibemacs-worktrees-dashboard--activate entry)
+                  ;; Dashboard is in center-window (physical LEFT)
+                  (with-selected-window center-window
+                    (goto-char (point-min))
+                    (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
+                    (when (bound-and-true-p hl-line-mode)
+                      (hl-line-highlight)))
+                  ;; Chat is in right-window (physical MIDDLE)
+                  (select-window right-window)
+                  (condition-case err
+                      (vibemacs-worktrees-center-show-chat entry)
+                    (error
+                     (message "vibemacs: unable to open chat console (%s)"
+                              (error-message-string err))))
+                  (vibemacs-worktrees--files-refresh entry nil)
+                  ;; Git status is in left-window (physical RIGHT)
+                  (when left-window
+                    (vibemacs-worktrees-git-status--populate entry)))
+                (setq applied t)
+                (select-window right-window)))))
+
+         ;; Two-column layout: left (dashboard) + center (chat), no right sidebar
+         ((>= frame-width min-two-column)
           (let* ((max-left (max min-left (- frame-width min-center)))
-                 (auto-width (max min-left (min max-left (floor (* frame-width 0.25)))))
+                 (auto-width (max min-left (min max-left (floor (* frame-width 0.20)))))
                  (desired (or vibemacs-worktrees-startup-left-width auto-width))
                  (left-width (max min-left (min max-left desired)))
                  (left-window (split-window root-window left-width 'left))
-                 (right-window root-window)
+                 (center-window root-window)
                  (entries (vibemacs-worktrees--entries-safe))
                  (entry (or (cl-find vibemacs-worktrees--active-root entries
                                      :key #'vibemacs-worktrees--entry-root
@@ -2214,10 +2414,9 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (set-window-dedicated-p left-window t)
             (set-window-parameter left-window 'window-size-fixed 'width)
             (set-window-parameter left-window 'no-delete-other-windows t)
-            (window-resize left-window (- left-width (window-total-width left-window)) t)
-            (set-window-parameter left-window 'window-preserved-size
-                                  (cons 'width left-width))
-            (setq vibemacs-worktrees--center-window right-window)
+            (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
+            (setq vibemacs-worktrees--center-window center-window)
+            (setq vibemacs-worktrees--right-window nil)
             (when entry
               (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
               (vibemacs-worktrees-dashboard--activate entry)
@@ -2226,7 +2425,7 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                 (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
                 (when (bound-and-true-p hl-line-mode)
                   (hl-line-highlight)))
-              (select-window right-window)
+              (select-window center-window)
               (condition-case err
                   (vibemacs-worktrees-center-show-chat entry)
                 (error
@@ -2234,7 +2433,17 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                           (error-message-string err))))
               (vibemacs-worktrees--files-refresh entry nil))
             (setq applied t)
-            (select-window right-window)))
+            (select-window center-window)
+            (message "vibemacs: frame width %d < %d; showing two-column layout." frame-width min-three-column)))
+
+         ;; One-column layout: dashboard only
+         (t
+          (setq vibemacs-worktrees--center-window nil)
+          (setq vibemacs-worktrees--right-window nil)
+          (set-window-buffer root-window dashboard-buffer)
+          (set-window-dedicated-p root-window t)
+          (setq applied t)
+          (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))
         (setq vibemacs-worktrees--startup-applied applied)
         applied))))
 
