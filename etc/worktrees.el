@@ -2298,14 +2298,9 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (left-width (max min-left (min max-left desired-left)))
 
                  ;; Split left: creates new window on left, returns it
-                 (new-left (split-window root-window left-width 'left)))
+                 (new-left (split-window root-window left-width 'left))
 
-            ;; Debug: check what split-window actually returned
-            (message "  After left split: new-left width=%d root width=%d"
-                     (window-total-width new-left)
-                     (window-total-width root-window))
-
-            (let* (;; Assign based on which is actually small
+                 ;; Assign based on which is actually small
                  (left-window (if (< (window-total-width new-left) (window-total-width root-window))
                                   new-left
                                 root-window))
@@ -2338,6 +2333,9 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                                (car entries))))
 
                 ;; Debug output with physical positions
+                (message "  After left split: new-left width=%d root width=%d"
+                         (window-total-width new-left)
+                         (window-total-width root-window))
                 (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d right-actual=%s can-split-right=%s"
                          frame-width left-width actual-left-width
                          (window-total-width center-window) right-width
