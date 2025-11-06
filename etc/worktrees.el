@@ -953,6 +953,93 @@ If ENTRY is nil prompt the user."
       (vibemacs-worktrees--save-metadata entry
                                          (vibemacs-worktrees--default-metadata entry)))
     (find-file path)))
+
+(defun vibemacs-worktrees--read-setup-config (repo)
+  "Read and parse .vibemacs/worktrees.json from REPO.
+Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid."
+  (let ((config-path (expand-file-name ".vibemacs/worktrees.json" repo)))
+    (message "[worktrees] Looking for config at: %s" config-path)
+    (message "[worktrees] File exists: %s" (file-exists-p config-path))
+    (message "[worktrees] File readable: %s" (file-readable-p config-path))
+    (if (file-readable-p config-path)
+        (condition-case err
+            (with-temp-buffer
+              (insert-file-contents config-path)
+              (message "[worktrees] Config file contents: %s" (buffer-string))
+              (goto-char (point-min))
+              (let ((config (json-parse-buffer :object-type 'alist :array-type 'list)))
+                (message "[worktrees] Parsed config: %S" config)
+                (message "[worktrees] Config type: %s" (type-of config))
+                (message "[worktrees] Config loaded successfully")
+                config))
+          (error
+           (message "[worktrees] Failed to parse %s: %s" config-path (error-message-string err))
+           nil))
+      (message "[worktrees] Config file not found or not readable")
+      nil)))
+
+(defun vibemacs-worktrees--run-setup-command (cmd-list target-path repo name index)
+  "Run setup commands sequentially from CMD-LIST.
+TARGET-PATH is the new worktree path, REPO is the root worktree,
+NAME is the worktree name, and INDEX is the current command index."
+  (if (null cmd-list)
+      (message "[worktrees] All setup commands completed for %s" name)
+    (let* ((cmd (car cmd-list))
+           (remaining (cdr cmd-list))
+           (default-directory target-path)
+           (process-environment (copy-sequence process-environment))
+           (expanded-cmd (replace-regexp-in-string
+                          "\\$ROOT_WORKTREE_PATH"
+                          repo
+                          cmd)))
+      ;; Set ROOT_WORKTREE_PATH environment variable
+      (setenv "ROOT_WORKTREE_PATH" repo)
+      (message "[worktrees] [%d/%d] Executing: %s"
+               (1+ index)
+               (+ (length cmd-list) index)
+               expanded-cmd)
+      (let ((proc (start-process-shell-command
+                   (format "setup-%s-%d" name index)
+                   (generate-new-buffer (format "*worktree-setup-%s-%d*" name index))
+                   expanded-cmd)))
+        (set-process-sentinel
+         proc
+         (lambda (process event)
+           (when (string-match-p "finished\\|exited" event)
+             (if (zerop (process-exit-status process))
+                 (progn
+                   (message "[worktrees] ✓ Command completed: %s" expanded-cmd)
+                   ;; Run next command
+                   (vibemacs-worktrees--run-setup-command
+                    remaining target-path repo name (1+ index)))
+               (message "[worktrees] ✗ Command failed (exit %d): %s\nSee buffer: %s"
+                        (process-exit-status process)
+                        expanded-cmd
+                        (buffer-name (process-buffer process)))))))))))
+
+(defun vibemacs-worktrees--run-setup-commands (repo target-path name)
+  "Run setup commands from .vibemacs/worktrees.json config.
+REPO is the root worktree path, TARGET-PATH is the new worktree path,
+and NAME is the worktree name."
+  (message "[worktrees] Starting setup for worktree: %s" name)
+  (message "[worktrees] Root worktree: %s" repo)
+  (message "[worktrees] Target path: %s" target-path)
+  (let* ((config (vibemacs-worktrees--read-setup-config repo))
+         (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
+    (message "[worktrees] Config object: %S" config)
+    (when config
+      (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
+    (message "[worktrees] Commands lookup result: %S" commands)
+    (message "[worktrees] Commands type: %s" (type-of commands))
+    (message "[worktrees] Commands is list: %s" (listp commands))
+    (message "[worktrees] Commands length: %s" (when commands (length commands)))
+    (if (and commands (listp commands) (> (length commands) 0))
+        (progn
+          (message "[worktrees] Found %d setup command(s)" (length commands))
+          ;; Start running commands sequentially
+          (vibemacs-worktrees--run-setup-command commands target-path repo name 0))
+      (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json"))))
+
 ;;;###autoload
 (defun vibemacs-worktrees-new ()
   "Create a new git worktree and register it."
@@ -994,18 +1081,12 @@ If ENTRY is nil prompt the user."
                      :root target-path
                      :base base
                      :created (vibemacs-worktrees--timestamp)))
-             (env-source (expand-file-name ".env.local" repo))
-             (env-target (expand-file-name ".env.local" target-path))
              (metadata (vibemacs-worktrees--default-metadata entry)))
         (vibemacs-worktrees--register entry)
         (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
         (vibemacs-worktrees--save-metadata entry metadata)
-        (when (file-readable-p env-source)
-          (condition-case err
-              (progn
-                (copy-file env-source env-target t)
-                (message "Copied .env.local → %s" (abbreviate-file-name env-target)))
-            (error (message "Failed to copy .env.local: %s" (error-message-string err)))))
+        ;; Run setup commands from .vibemacs/worktrees.json
+        (vibemacs-worktrees--run-setup-commands repo target-path name)
         (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
                                   vibemacs-worktrees--center-window)))
           (vibemacs-worktrees-dashboard--activate entry)
