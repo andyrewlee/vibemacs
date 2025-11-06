@@ -2317,7 +2317,6 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (set-window-dedicated-p left-window t)
             (set-window-parameter left-window 'window-size-fixed 'width)
             (set-window-parameter left-window 'no-delete-other-windows t)
-            (window-resize left-window (- left-width (window-total-width left-window)) t)
             (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
 
             ;; Setup right (git status)
@@ -2367,7 +2366,6 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (set-window-dedicated-p left-window t)
             (set-window-parameter left-window 'window-size-fixed 'width)
             (set-window-parameter left-window 'no-delete-other-windows t)
-            (window-resize left-window (- left-width (window-total-width left-window)) t)
             (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
             (setq vibemacs-worktrees--center-window center-window)
             (setq vibemacs-worktrees--right-window nil)
