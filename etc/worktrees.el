@@ -959,12 +959,17 @@ If ENTRY is nil prompt the user."
 Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid."
   (let ((config-path (expand-file-name ".vibemacs/worktrees.json" repo)))
     (message "[worktrees] Looking for config at: %s" config-path)
+    (message "[worktrees] File exists: %s" (file-exists-p config-path))
+    (message "[worktrees] File readable: %s" (file-readable-p config-path))
     (if (file-readable-p config-path)
         (condition-case err
             (with-temp-buffer
               (insert-file-contents config-path)
+              (message "[worktrees] Config file contents: %s" (buffer-string))
               (goto-char (point-min))
               (let ((config (json-parse-buffer :object-type 'alist :array-type 'list)))
+                (message "[worktrees] Parsed config: %S" config)
+                (message "[worktrees] Config type: %s" (type-of config))
                 (message "[worktrees] Config loaded successfully")
                 config))
           (error
@@ -1021,8 +1026,13 @@ and NAME is the worktree name."
   (message "[worktrees] Target path: %s" target-path)
   (let* ((config (vibemacs-worktrees--read-setup-config repo))
          (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
+    (message "[worktrees] Config object: %S" config)
     (when config
       (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
+    (message "[worktrees] Commands lookup result: %S" commands)
+    (message "[worktrees] Commands type: %s" (type-of commands))
+    (message "[worktrees] Commands is list: %s" (listp commands))
+    (message "[worktrees] Commands length: %s" (when commands (length commands)))
     (if (and commands (listp commands) (> (length commands) 0))
         (progn
           (message "[worktrees] Found %d setup command(s)" (length commands))
