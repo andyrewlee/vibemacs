@@ -2299,15 +2299,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
 
                  ;; Split left: creates new window on left, returns it
                  (new-left (split-window root-window left-width 'left))
-                 ;; Assign based on physical position (column), not size
-                 ;; The window at column 0 is physically LEFT (should be small sidebar)
-                 ;; The window at higher column is physically RIGHT (should be larger center)
-                 (left-window (if (< (window-left-column new-left) (window-left-column root-window))
-                                  new-left
-                                root-window))
-                 (center-window (if (< (window-left-column new-left) (window-left-column root-window))
-                                    root-window
-                                  new-left))
+                 ;; Just use straightforward assignment - the split creates correct sizes
+                 ;; new-left should be small (24), root-window should be large (138)
+                 (left-window new-left)
+                 (center-window root-window)
 
                  ;; Now get actual center width after left split
                  (actual-center-width (window-total-width center-window))
@@ -2321,20 +2316,11 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
                  (right-window nil))  ;; Initialize right-window
 
-            ;; Do the right split OUTSIDE of let* so we can update center-window
+            ;; Do the right split - straightforward assignment
             (when can-split-right
-              (let* ((old-center center-window)
-                     (new-right (split-window center-window (- right-width) 'right)))
-                ;; Assign based on physical position (column), not size
-                ;; After this split, we have left (small), center (large), and right (small)
-                ;; old-center and new-right: whichever is at the higher column is physically RIGHT
-                (if (< (window-left-column new-right) (window-left-column old-center))
-                    ;; new-right has lower column, so it's actually in the middle, old-center moved right
-                    (setq center-window new-right
-                          right-window old-center)
-                  ;; new-right has higher column, so it's on the right, old-center stays middle
-                  (setq center-window old-center
-                        right-window new-right))))
+              (setq right-window (split-window center-window (- right-width) 'right))
+              ;; center-window stays as is (the original window on the left of the split)
+              )
 
             (let ((entries (vibemacs-worktrees--entries-safe)))
               (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
