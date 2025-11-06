@@ -958,50 +958,75 @@ If ENTRY is nil prompt the user."
   "Read and parse .vibemacs/worktrees.json from REPO.
 Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid."
   (let ((config-path (expand-file-name ".vibemacs/worktrees.json" repo)))
-    (when (file-readable-p config-path)
-      (condition-case err
-          (with-temp-buffer
-            (insert-file-contents config-path)
-            (goto-char (point-min))
-            (json-parse-buffer :object-type 'alist :array-type 'list))
-        (error
-         (message "Failed to parse %s: %s" config-path (error-message-string err))
-         nil)))))
+    (message "[worktrees] Looking for config at: %s" config-path)
+    (if (file-readable-p config-path)
+        (condition-case err
+            (with-temp-buffer
+              (insert-file-contents config-path)
+              (goto-char (point-min))
+              (let ((config (json-parse-buffer :object-type 'alist :array-type 'list)))
+                (message "[worktrees] Config loaded successfully")
+                config))
+          (error
+           (message "[worktrees] Failed to parse %s: %s" config-path (error-message-string err))
+           nil))
+      (message "[worktrees] Config file not found or not readable")
+      nil)))
+
+(defun vibemacs-worktrees--run-setup-command (cmd-list target-path repo name index)
+  "Run setup commands sequentially from CMD-LIST.
+TARGET-PATH is the new worktree path, REPO is the root worktree,
+NAME is the worktree name, and INDEX is the current command index."
+  (if (null cmd-list)
+      (message "[worktrees] All setup commands completed for %s" name)
+    (let* ((cmd (car cmd-list))
+           (remaining (cdr cmd-list))
+           (default-directory target-path)
+           (process-environment (copy-sequence process-environment))
+           (expanded-cmd (replace-regexp-in-string
+                          "\\$ROOT_WORKTREE_PATH"
+                          repo
+                          cmd)))
+      ;; Set ROOT_WORKTREE_PATH environment variable
+      (setenv "ROOT_WORKTREE_PATH" repo)
+      (message "[worktrees] [%d/%d] Executing: %s"
+               (1+ index)
+               (+ (length cmd-list) index)
+               expanded-cmd)
+      (let ((proc (start-process-shell-command
+                   (format "setup-%s-%d" name index)
+                   (generate-new-buffer (format "*worktree-setup-%s-%d*" name index))
+                   expanded-cmd)))
+        (set-process-sentinel
+         proc
+         (lambda (process event)
+           (when (string-match-p "finished\\|exited" event)
+             (if (zerop (process-exit-status process))
+                 (progn
+                   (message "[worktrees] ✓ Command completed: %s" expanded-cmd)
+                   ;; Run next command
+                   (vibemacs-worktrees--run-setup-command
+                    remaining target-path repo name (1+ index)))
+               (message "[worktrees] ✗ Command failed (exit %d): %s\nSee buffer: %s"
+                        (process-exit-status process)
+                        expanded-cmd
+                        (buffer-name (process-buffer process)))))))))))
 
 (defun vibemacs-worktrees--run-setup-commands (repo target-path name)
   "Run setup commands from .vibemacs/worktrees.json config.
 REPO is the root worktree path, TARGET-PATH is the new worktree path,
 and NAME is the worktree name."
+  (message "[worktrees] Starting setup for worktree: %s" name)
+  (message "[worktrees] Root worktree: %s" repo)
+  (message "[worktrees] Target path: %s" target-path)
   (let* ((config (vibemacs-worktrees--read-setup-config repo))
          (commands (when config (alist-get 'setup-worktree config))))
-    (if (and commands (listp commands))
-        (let ((default-directory target-path)
-              (process-environment (copy-sequence process-environment)))
-          ;; Set ROOT_WORKTREE_PATH environment variable
-          (setenv "ROOT_WORKTREE_PATH" repo)
-          (message "Running setup commands for worktree %s..." name)
-          ;; Execute commands sequentially
-          (dolist (cmd commands)
-            (when (stringp cmd)
-              (let* ((expanded-cmd (replace-regexp-in-string
-                                    "\\$ROOT_WORKTREE_PATH"
-                                    repo
-                                    cmd))
-                     (proc (start-process-shell-command
-                            (format "setup-%s" name)
-                            (generate-new-buffer (format "*worktree-setup-%s*" name))
-                            expanded-cmd)))
-                (set-process-sentinel
-                 proc
-                 (lambda (process event)
-                   (when (string-match-p "finished\\|exited" event)
-                     (if (zerop (process-exit-status process))
-                         (message "Setup command completed: %s" expanded-cmd)
-                       (message "Setup command failed: %s (see %s)"
-                                expanded-cmd
-                                (buffer-name (process-buffer process)))))))
-                (message "Executing: %s" expanded-cmd)))))
-      (message "No setup-worktree commands found in .vibemacs/worktrees.json"))))
+    (if (and commands (listp commands) (> (length commands) 0))
+        (progn
+          (message "[worktrees] Found %d setup command(s)" (length commands))
+          ;; Start running commands sequentially
+          (vibemacs-worktrees--run-setup-command commands target-path repo name 0))
+      (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json"))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-new ()
