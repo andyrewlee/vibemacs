@@ -2319,8 +2319,29 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
 
                  ;; Only split right if we have enough space
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
-                 (right-window (when can-split-right
-                                 (split-window center-window (- right-width) 'right)))
+
+                 ;; Store old center before split
+                 (old-center center-window)
+
+                 ;; Split right and handle window assignment
+                 (new-right (when can-split-right
+                              (split-window center-window (- right-width) 'right)))
+
+                 ;; After right split, verify which window is which based on size
+                 ;; The center should be larger than the right sidebar
+                 (right-window (when new-right
+                                 (if (< (window-total-width new-right)
+                                        (window-total-width old-center))
+                                     new-right
+                                   old-center)))
+
+                 ;; Update center-window to point to the actual center (not the right sidebar)
+                 (center-window (if (and new-right right-window)
+                                    (if (eq right-window new-right)
+                                        old-center
+                                      new-right)
+                                  center-window))
+
                  (entries (vibemacs-worktrees--entries-safe))
                  (entry (or (cl-find vibemacs-worktrees--active-root entries
                                      :key #'vibemacs-worktrees--entry-root
@@ -2328,8 +2349,11 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                             (car entries))))
 
             ;; Debug output
-            (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d can-split-right=%s"
-                     frame-width left-width actual-left-width actual-center-width right-width can-split-right)
+            (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d right-actual=%s can-split-right=%s"
+                     frame-width left-width actual-left-width
+                     (window-total-width center-window) right-width
+                     (when right-window (window-total-width right-window))
+                     can-split-right)
 
             ;; Setup left (dashboard)
             (set-window-buffer left-window dashboard-buffer)
