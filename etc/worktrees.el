@@ -2297,15 +2297,20 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
                  (left-width (max min-left (min max-left desired-left)))
 
-                 (remaining (- frame-width left-width))
-                 (max-right (- remaining min-center))
+                 (left-window (split-window root-window left-width 'left))
+                 (center-window root-window)
+
+                 ;; Now get actual center width after left split
+                 (actual-center-width (window-total-width center-window))
+                 (max-right (max 0 (- actual-center-width min-center)))
                  (auto-right (max min-right (min max-right (floor (* frame-width 0.15)))))
                  (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
                  (right-width (max min-right (min max-right desired-right)))
 
-                 (left-window (split-window root-window left-width 'left))
-                 (center-window root-window)
-                 (right-window (split-window center-window (- right-width) 'right))
+                 ;; Only split right if we have enough space
+                 (can-split-right (>= actual-center-width (+ min-center min-right)))
+                 (right-window (when can-split-right
+                                 (split-window center-window (- right-width) 'right)))
                  (entries (vibemacs-worktrees--entries-safe))
                  (entry (or (cl-find vibemacs-worktrees--active-root entries
                                      :key #'vibemacs-worktrees--entry-root
@@ -2319,12 +2324,13 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (set-window-parameter left-window 'no-delete-other-windows t)
             (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
 
-            ;; Setup right (git status)
-            (set-window-buffer right-window git-status-buffer)
-            (set-window-dedicated-p right-window t)
-            (set-window-parameter right-window 'window-size-fixed 'width)
-            (set-window-parameter right-window 'no-delete-other-windows t)
-            (set-window-parameter right-window 'window-preserved-size (cons 'width right-width))
+            ;; Setup right (git status) only if split succeeded
+            (when right-window
+              (set-window-buffer right-window git-status-buffer)
+              (set-window-dedicated-p right-window t)
+              (set-window-parameter right-window 'window-size-fixed 'width)
+              (set-window-parameter right-window 'no-delete-other-windows t)
+              (set-window-parameter right-window 'window-preserved-size (cons 'width right-width)))
 
             ;; Store references
             (setq vibemacs-worktrees--center-window center-window)
@@ -2345,7 +2351,8 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (message "vibemacs: unable to open chat console (%s)"
                           (error-message-string err))))
               (vibemacs-worktrees--files-refresh entry nil)
-              (vibemacs-worktrees-git-status--populate entry))
+              (when right-window
+                (vibemacs-worktrees-git-status--populate entry)))
             (setq applied t)
             (select-window center-window)))
 
