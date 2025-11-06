@@ -2340,12 +2340,16 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                                         :test #'string=)
                                (car entries))))
 
-                ;; Debug output
+                ;; Debug output with buffer names to identify physical positions
                 (message "vibemacs layout: frame=%d left-req=%d left-actual=%d center-actual=%d right-req=%d right-actual=%s can-split-right=%s"
                          frame-width left-width actual-left-width
                          (window-total-width center-window) right-width
                          (when right-window (window-total-width right-window))
                          can-split-right)
+                (message "  BEFORE buffer assignment: left-buf=%s center-buf=%s right-buf=%s"
+                         (buffer-name (window-buffer left-window))
+                         (buffer-name (window-buffer center-window))
+                         (when right-window (buffer-name (window-buffer right-window))))
 
                 ;; Assign based on what you're actually seeing:
                 ;; Physical LEFT (HUGE, 114 wide) = center-window var → needs dashboard (24)
