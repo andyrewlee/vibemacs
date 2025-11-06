@@ -2297,8 +2297,17 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
                  (left-width (max min-left (min max-left desired-left)))
 
-                 (left-window (split-window root-window left-width 'left))
-                 (center-window root-window)
+                 ;; Split left: creates new window on left, returns it
+                 ;; The returned window should be small (left sidebar)
+                 ;; The original root-window becomes the large center/right area
+                 (new-left (split-window root-window left-width 'left))
+                 ;; Assign based on actual sizes to handle any quirks
+                 (left-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                  new-left
+                                root-window))
+                 (center-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                    root-window
+                                  new-left))
 
                  ;; Now get actual center width after left split
                  (actual-center-width (window-total-width center-window))
