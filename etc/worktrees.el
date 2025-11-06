@@ -2353,6 +2353,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
 
                 ;; Physical LEFT: dashboard (center-window)
                 (set-window-buffer center-window dashboard-buffer)
+                ;; Resize center-window to the correct width for dashboard
+                (let ((delta (- left-width (window-total-width center-window))))
+                  (when (/= delta 0)
+                    (window-resize center-window delta t)))
                 (set-window-dedicated-p center-window t)
                 (set-window-parameter center-window 'window-size-fixed 'width)
                 (set-window-parameter center-window 'no-delete-other-windows t)
