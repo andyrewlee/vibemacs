@@ -2347,51 +2347,44 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                          (when right-window (window-total-width right-window))
                          can-split-right)
 
-                ;; The window variables don't match physical positions, so assign buffers accordingly
-                ;; center-window is physically LEFT → dashboard
-                (set-window-buffer center-window dashboard-buffer)
-                (set-window-dedicated-p center-window t)
-                (set-window-parameter center-window 'window-size-fixed 'width)
-                (set-window-parameter center-window 'no-delete-other-windows t)
-                (set-window-parameter center-window 'window-preserved-size (cons 'width left-width))
+                ;; Setup left (dashboard)
+                (set-window-buffer left-window dashboard-buffer)
+                (set-window-dedicated-p left-window t)
+                (set-window-parameter left-window 'window-size-fixed 'width)
+                (set-window-parameter left-window 'no-delete-other-windows t)
+                (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
 
-                ;; right-window is physically MIDDLE → chat
-                ;; left-window is physically RIGHT → git status
+                ;; Setup right (git status) only if split succeeded
                 (when right-window
-                  (set-window-buffer left-window git-status-buffer)
-                  (set-window-dedicated-p left-window t)
-                  (set-window-parameter left-window 'window-size-fixed 'width)
-                  (set-window-parameter left-window 'no-delete-other-windows t)
-                  (set-window-parameter left-window 'window-preserved-size (cons 'width right-width)))
+                  (set-window-buffer right-window git-status-buffer)
+                  (set-window-dedicated-p right-window t)
+                  (set-window-parameter right-window 'window-size-fixed 'width)
+                  (set-window-parameter right-window 'no-delete-other-windows t)
+                  (set-window-parameter right-window 'window-preserved-size (cons 'width right-width)))
 
-                ;; Store references (adjust for physical positions)
-                ;; Physical middle (right-window var) is the actual center content window
-                (setq vibemacs-worktrees--center-window right-window)
-                ;; Physical right (left-window var) is the actual right sidebar
-                (setq vibemacs-worktrees--right-window left-window)
+                ;; Store references
+                (setq vibemacs-worktrees--center-window center-window)
+                (setq vibemacs-worktrees--right-window right-window)
 
                 (when entry
                   (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
                   (vibemacs-worktrees-dashboard--activate entry)
-                  ;; Dashboard is in center-window var (physical left)
-                  (with-selected-window center-window
+                  (with-selected-window left-window
                     (goto-char (point-min))
                     (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
                     (when (bound-and-true-p hl-line-mode)
                       (hl-line-highlight)))
-                  ;; Select the chat window (right-window var, physical middle)
-                  (select-window right-window)
+                  (select-window center-window)
                   (condition-case err
                       (vibemacs-worktrees-center-show-chat entry)
                     (error
                      (message "vibemacs: unable to open chat console (%s)"
                               (error-message-string err))))
                   (vibemacs-worktrees--files-refresh entry nil)
-                  ;; Populate git status in left-window var (physical right)
-                  (when left-window
+                  (when right-window
                     (vibemacs-worktrees-git-status--populate entry)))
                 (setq applied t)
-                (select-window right-window)))))
+                (select-window center-window)))))
 
          ;; Two-column layout: left (dashboard) + center (chat), no right sidebar
          ((>= frame-width min-two-column)
