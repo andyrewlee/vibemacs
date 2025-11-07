@@ -446,7 +446,9 @@ HELP overrides the default hover tooltip."
   "Ensure the git status sidebar buffer exists, returning it."
   (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
     (with-current-buffer buffer
-      (vibemacs-worktrees-git-status-mode))
+      (vibemacs-worktrees-git-status-mode)
+      ;; Stop auto-refresh when buffer is killed
+      (add-hook 'kill-buffer-hook #'vibemacs-worktrees-git-status--stop-auto-refresh nil t))
     buffer))
 
 (defun vibemacs-worktrees-git-status-open-file ()
@@ -463,7 +465,8 @@ HELP overrides the default hover tooltip."
   "Refresh the git status sidebar for the current worktree."
   (interactive)
   (when-let ((entry (vibemacs-worktrees-center--current-entry)))
-    (vibemacs-worktrees-git-status--populate entry)))
+    (vibemacs-worktrees-git-status--populate entry)
+    (vibemacs-worktrees-git-status--start-auto-refresh)))
 
 (defun vibemacs-worktrees-git-status--populate (entry)
   "Populate the git status sidebar with changed files for ENTRY."
@@ -500,6 +503,84 @@ HELP overrides the default hover tooltip."
         (goto-char (point-min))
         (forward-line 3)))
     buffer))
+
+;;; Git Status Auto-Refresh
+
+(defvar vibemacs-worktrees-git-status--file-watcher nil
+  "File watcher descriptor for auto-refreshing git status.")
+
+(defvar vibemacs-worktrees-git-status--refresh-timer nil
+  "Timer for periodic git status refresh.")
+
+(defvar vibemacs-worktrees-git-status--last-refresh-time 0
+  "Time of last git status refresh, for debouncing.")
+
+(defvar vibemacs-worktrees-git-status--refresh-debounce 0.5
+  "Minimum seconds between git status refreshes.")
+
+(defvar vibemacs-worktrees-git-status--refresh-interval 3
+  "Seconds between periodic git status refreshes (nil to disable).")
+
+(defun vibemacs-worktrees-git-status--debounced-refresh ()
+  "Refresh git status if enough time has passed since last refresh."
+  (let ((now (float-time)))
+    (when (> (- now vibemacs-worktrees-git-status--last-refresh-time)
+             vibemacs-worktrees-git-status--refresh-debounce)
+      (setq vibemacs-worktrees-git-status--last-refresh-time now)
+      (when-let ((entry (vibemacs-worktrees-center--current-entry)))
+        (vibemacs-worktrees-git-status--populate entry)))))
+
+(defun vibemacs-worktrees-git-status--after-save-hook ()
+  "Hook function to refresh git status after saving a file."
+  (when (and (buffer-file-name)
+             (vibemacs-worktrees-center--current-entry))
+    (vibemacs-worktrees-git-status--debounced-refresh)))
+
+(defun vibemacs-worktrees-git-status--start-auto-refresh ()
+  "Start auto-refresh mechanisms for git status sidebar."
+  (when-let ((entry (vibemacs-worktrees-center--current-entry)))
+    (let ((root (vibemacs-worktrees--entry-root entry)))
+      ;; Stop any existing watchers/timers first
+      (vibemacs-worktrees-git-status--stop-auto-refresh)
+
+      ;; Watch .git/index for git operations (staging, commits, etc.)
+      (let ((git-index (expand-file-name ".git/index" root)))
+        (when (file-exists-p git-index)
+          (condition-case err
+              (setq vibemacs-worktrees-git-status--file-watcher
+                    (file-notify-add-watch
+                     git-index
+                     '(change)
+                     (lambda (_event)
+                       (vibemacs-worktrees-git-status--debounced-refresh))))
+            (error
+             (message "Could not set up git status file watcher: %s" err)))))
+
+      ;; Add after-save hook for immediate updates when files are saved
+      (add-hook 'after-save-hook #'vibemacs-worktrees-git-status--after-save-hook)
+
+      ;; Set up periodic refresh timer if interval is configured
+      (when vibemacs-worktrees-git-status--refresh-interval
+        (setq vibemacs-worktrees-git-status--refresh-timer
+              (run-with-timer vibemacs-worktrees-git-status--refresh-interval
+                            vibemacs-worktrees-git-status--refresh-interval
+                            #'vibemacs-worktrees-git-status--debounced-refresh))))))
+
+(defun vibemacs-worktrees-git-status--stop-auto-refresh ()
+  "Stop auto-refresh mechanisms for git status sidebar."
+  ;; Remove file watcher
+  (when vibemacs-worktrees-git-status--file-watcher
+    (ignore-errors
+      (file-notify-rm-watch vibemacs-worktrees-git-status--file-watcher))
+    (setq vibemacs-worktrees-git-status--file-watcher nil))
+
+  ;; Remove timer
+  (when vibemacs-worktrees-git-status--refresh-timer
+    (cancel-timer vibemacs-worktrees-git-status--refresh-timer)
+    (setq vibemacs-worktrees-git-status--refresh-timer nil))
+
+  ;; Remove after-save hook
+  (remove-hook 'after-save-hook #'vibemacs-worktrees-git-status--after-save-hook))
 
 ;;; Transient Dispatcher
 

@@ -16,6 +16,7 @@
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
 (declare-function vibemacs-worktrees-git-status--setup-buffer "worktrees-dashboard")
 (declare-function vibemacs-worktrees-git-status--populate "worktrees-dashboard")
+(declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-dashboard")
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vterm "vterm")
 (defvar vterm-buffer-name)
@@ -235,7 +236,8 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                               (error-message-string err))))
                   (vibemacs-worktrees--files-refresh entry nil)
                   (when left-window
-                    (vibemacs-worktrees-git-status--populate entry)))
+                    (vibemacs-worktrees-git-status--populate entry)
+                    (vibemacs-worktrees-git-status--start-auto-refresh)))
                 (setq applied t)
                 (select-window right-window)))))
          ;; Two-column layout
