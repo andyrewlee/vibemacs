@@ -16,6 +16,7 @@
 (require 'worktrees-chat)
 (require 'worktrees-dashboard)
 (require 'worktrees-layout)
+(require 'worktrees-cleanup)
 
 (provide 'worktrees)
 ;;; worktrees.el ends here

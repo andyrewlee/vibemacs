@@ -21,6 +21,7 @@ The heart of vibemacs is a modular worktree management system split into focused
 - **worktrees-chat.el**: AI assistant chat buffer management via vterm
 - **worktrees-dashboard.el**: Dashboard UI (tabulated-list-mode), git status sidebar
 - **worktrees-layout.el**: Window layout management and pane orchestration
+- **worktrees-cleanup.el**: Utilities for finding and removing orphaned metadata
 - **worktrees.el**: Entry point that requires all modules in dependency order
 
 ### Key Concepts
@@ -92,6 +93,17 @@ Always use the helper functions:
 - `vibemacs-worktrees--save-metadata` to persist
 - `vibemacs-worktrees--ensure-metadata` to initialize
 
+### Metadata Cleanup
+
+Metadata is automatically cleaned up when worktrees are deleted through vibemacs. However, orphaned metadata may accumulate if worktrees are deleted outside vibemacs (e.g., via `git worktree remove` directly).
+
+Cleanup utilities:
+- `vibemacs-worktrees-show-metadata-stats`: Display metadata statistics (active vs. orphaned)
+- `vibemacs-worktrees-find-orphaned-metadata`: List orphaned metadata directories
+- `vibemacs-worktrees-cleanup-orphaned-metadata`: Remove orphaned metadata (prompts for confirmation)
+
+Access via transient menu: `SPC a w` → `m` (stats) or `M` (cleanup)
+
 ### Evil Mode Integration
 
 When adding new keybindings to custom modes:
@@ -161,7 +173,7 @@ Dashboard and list views use `tabulated-list-mode`:
 
 - **Main init**: `~/.emacs.d/init.el`
 - **Custom settings**: `~/.emacs.d/custom.el`
-- **Worktree modules**: `~/.emacs.d/etc/worktrees*.el`
+- **Worktree modules**: `~/.emacs.d/etc/worktrees*.el` (including `worktrees-cleanup.el`)
 - **Registry**: `~/.vibemacs/worktrees.json` (or `$VIBEMACS_HOME/worktrees.json`)
-- **Metadata**: `~/.vibemacs/metadata/<repo-hash>/<worktree-name>/metadata.json`
+- **Metadata**: `~/.vibemacs/worktrees-metadata/<hash>/worktree.json`
 - **Worktree checkouts**: `~/.vibemacs/worktrees/<repo-name>/<worktree-name>/`

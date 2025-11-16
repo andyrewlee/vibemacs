@@ -598,7 +598,9 @@ HELP overrides the default hover tooltip."
    ("t" "Open terminal" vibemacs-worktrees-open-terminal)
    ("e" "Edit config" vibemacs-worktrees-edit-config)
    ("v" "View activity" vibemacs-worktrees-show-activity)
-   ("C" "Clear markers" vibemacs-worktrees-clear-all-markers)]
+   ("C" "Clear markers" vibemacs-worktrees-clear-all-markers)
+   ("m" "Metadata stats" vibemacs-worktrees-show-metadata-stats)
+   ("M" "Cleanup metadata" vibemacs-worktrees-cleanup-orphaned-metadata)]
   ["Codex"
    ("p" "Plan (Codex)" vibemacs-worktrees-codex-plan)
    ("A" "Plan + apply" vibemacs-worktrees-codex-apply)
