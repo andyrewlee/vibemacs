@@ -4,8 +4,6 @@ emacs config for running multiple codex, claude code and gemini agents in parall
 
 ## Setup
 
-To use vibemacs with your project, you need a `.vibemacs` folder in your repo.
-
 For custom setup scripts when creating worktrees, add a `worktrees.json` file:
 
 ```json
