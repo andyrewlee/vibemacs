@@ -264,7 +264,10 @@ HELP overrides the default hover tooltip."
           (vibemacs-worktrees-dashboard--render-empty-state)
           (when target
             (ignore-errors (tabulated-list-goto-id target)))
-          (hl-line-highlight))))))
+          (hl-line-highlight)))))
+  ;; Update the right terminal to the new worktree
+  (when (fboundp 'vibemacs-worktrees-update-right-terminal)
+    (vibemacs-worktrees-update-right-terminal entry)))
 
 (defun vibemacs-worktrees-dashboard--current-entry ()
   "Return the worktree entry at point."
