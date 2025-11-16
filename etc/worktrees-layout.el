@@ -25,6 +25,31 @@
 
 ;;; Center Pane Management
 
+(defun vibemacs-worktrees--right-terminal-buffer (entry)
+  "Return or create a terminal buffer for ENTRY in the right sidebar."
+  (let* ((name (vibemacs-worktrees--entry-name entry))
+         (root (vibemacs-worktrees--entry-root entry))
+         (buffer-name (format "*worktree-%s-sidebar-term*" name))
+         (existing-buffer (get-buffer buffer-name)))
+    (if (and existing-buffer (buffer-live-p existing-buffer))
+        existing-buffer
+      (let ((default-directory root))
+        (vibemacs-worktrees--ensure-vterm)
+        (let ((vterm-buffer-name buffer-name))
+          (with-current-buffer (vterm)
+            (setq-local header-line-format nil)
+            (current-buffer)))))))
+
+(defun vibemacs-worktrees-update-right-terminal (&optional entry)
+  "Update the right terminal window to show terminal for ENTRY.
+When ENTRY is nil, use the currently active worktree."
+  (interactive)
+  (when (window-live-p vibemacs-worktrees--terminal-window)
+    (let ((entry (or entry (vibemacs-worktrees-center--current-entry))))
+      (when entry
+        (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
+          (set-window-buffer vibemacs-worktrees--terminal-window terminal-buffer))))))
+
 (defun vibemacs-worktrees-center--current-entry ()
   "Return the worktree entry currently highlighted in the dashboard."
   (let* ((entries (vibemacs-worktrees--entries-safe))
@@ -195,9 +220,15 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                                   new-left))
                  (actual-center-width (window-total-width center-window))
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
-                 (right-window nil))
+                 (right-window nil)
+                 (git-status-window nil)
+                 (terminal-window nil))
             (when can-split-right
-              (setq right-window (split-window center-window (- left-width) 'right)))
+              (setq right-window (split-window center-window (- left-width) 'right))
+              ;; Split left-window (git status) horizontally to add terminal at bottom
+              (when left-window
+                (setq git-status-window (split-window left-window nil 'above))
+                (setq terminal-window left-window)))
             (let ((entries (vibemacs-worktrees--entries-safe)))
               (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
                                         :key #'vibemacs-worktrees--entry-root
@@ -212,13 +243,21 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                 (set-window-parameter center-window 'no-delete-other-windows t)
                 (set-window-parameter center-window 'window-preserved-size (cons 'width left-width))
                 (when right-window
-                  (set-window-buffer left-window git-status-buffer)
-                  (set-window-dedicated-p left-window t)
-                  (set-window-parameter left-window 'window-size-fixed 'width)
-                  (set-window-parameter left-window 'no-delete-other-windows t)
-                  (set-window-parameter left-window 'window-preserved-size (cons 'width right-width)))
+                  (let ((status-win (or git-status-window left-window)))
+                    (set-window-buffer status-win git-status-buffer)
+                    (set-window-dedicated-p status-win t)
+                    (set-window-parameter status-win 'window-size-fixed 'width)
+                    (set-window-parameter status-win 'no-delete-other-windows t)
+                    (set-window-parameter status-win 'window-preserved-size (cons 'width right-width)))
+                  ;; Set up terminal in bottom window
+                  (when terminal-window
+                    (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
+                      (set-window-buffer terminal-window terminal-buffer)
+                      (set-window-parameter terminal-window 'window-size-fixed 'width)
+                      (set-window-parameter terminal-window 'no-delete-other-windows t))))
                 (setq vibemacs-worktrees--center-window right-window)
-                (setq vibemacs-worktrees--right-window left-window)
+                (setq vibemacs-worktrees--right-window (or git-status-window left-window))
+                (setq vibemacs-worktrees--terminal-window terminal-window)
                 (when entry
                   (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
                   (vibemacs-worktrees-dashboard--activate entry)

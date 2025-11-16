@@ -175,6 +175,9 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 (defvar vibemacs-worktrees--right-window nil
   "Window used for the right sidebar showing git status.")
 
+(defvar vibemacs-worktrees--terminal-window nil
+  "Window used for the terminal at the bottom of the right sidebar.")
+
 (defvar vibemacs-worktrees--transcript-buffers (make-hash-table :test 'equal)
   "Hash table mapping worktree roots to transcript buffers.")
 
