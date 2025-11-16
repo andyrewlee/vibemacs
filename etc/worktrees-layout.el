@@ -183,7 +183,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (auto-left (max min-left (min max-left (floor (* frame-width 0.15)))))
                  (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
                  (left-width (max min-left (min max-left desired-left)))
-                 (new-left (split-window root-window left-width 'left))
+                 (auto-right (max min-left (min max-left (floor (* frame-width 0.15)))))
+                 (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
+                 (right-width (max min-left (min max-left desired-right)))
+                 (new-left (split-window root-window right-width 'left))
                  (left-window (if (< (window-total-width new-left) (window-total-width root-window))
                                   new-left
                                 root-window))
@@ -191,14 +194,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                                     root-window
                                   new-left))
                  (actual-center-width (window-total-width center-window))
-                 (max-right (max 0 (- actual-center-width min-center)))
-                 (auto-right (max min-right (min max-right (floor (* frame-width 0.15)))))
-                 (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
-                 (right-width (max min-right (min max-right desired-right)))
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
                  (right-window nil))
             (when can-split-right
-              (setq right-window (split-window center-window (- right-width) 'right)))
+              (setq right-window (split-window center-window (- left-width) 'right)))
             (let ((entries (vibemacs-worktrees--entries-safe)))
               (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
                                         :key #'vibemacs-worktrees--entry-root

@@ -105,12 +105,7 @@
 (define-derived-mode vibemacs-worktrees-dashboard-mode tabulated-list-mode "Worktrees-Dashboard"
   "Dashboard view summarising vibemacs worktrees."
   (setq tabulated-list-format
-        [("Name" 18 t)
-         ("Branch" 15 t)
-         ("Status" 11 t)
-         ("Last Codex" 24 t)
-         ("Process" 8 nil)
-         ("Path" 24 nil)])
+        [("Name" 18 t)])
   (setq tabulated-list-padding 1)
   (setq tabulated-list-sort-key nil)
   (add-hook 'tabulated-list-revert-hook #'vibemacs-worktrees-dashboard--refresh nil t)
@@ -184,7 +179,7 @@ HELP overrides the default hover tooltip."
                 'vibemacs-worktrees-dashboard-create
                 nil
                 "Press RET to create a new worktree")))
-    (list :create (vector label "" "" "" "" ""))))
+    (list :create (vector label))))
 
 (defun vibemacs-worktrees-dashboard--entries ()
   "Produce tabulated entries for the dashboard respecting filters."
@@ -221,7 +216,7 @@ HELP overrides the default hover tooltip."
                        for path-cell = (vibemacs-worktrees-dashboard--format-cell path row-face)
                        when (or (not (eq vibemacs-worktrees-dashboard--filter 'dirty))
                                (> dirty-count 0))
-                       collect (list root (vector name branch-cell status-cell codex-cell running-cell path-cell)))))
+                       collect (list root (vector name)))))
     (cons (vibemacs-worktrees-dashboard--create-row) rows)))
 
 (defun vibemacs-worktrees-dashboard--refresh (&rest _)
