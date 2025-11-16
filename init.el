@@ -53,7 +53,7 @@ Returns non-nil on success, nil on failure."
 (when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
 (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
 (blink-cursor-mode -1)
-(global-display-line-numbers-mode 1)
+(global-display-line-numbers-mode -1)
 (when (fboundp 'pixel-scroll-precision-mode)
   (pixel-scroll-precision-mode 1))
 (setq ring-bell-function 'ignore
@@ -227,17 +227,17 @@ Returns non-nil on success, nil on failure."
   :hook ((prog-mode . diff-hl-mode)
          (magit-post-refresh . diff-hl-magit-post-refresh)))
 
-;;; solarized theme
-(use-package solarized-theme
+;;; doom-one theme (charcoal background, subdued accents)
+(use-package doom-themes
   :init
-  (setq solarized-use-variable-pitch nil
-        solarized-scale-org-headlines nil
-        solarized-scale-outline-headlines nil
-        solarized-use-less-bold t
-        solarized-emphasize-indicators nil)
+  (setq doom-themes-enable-bold nil
+        doom-themes-enable-italic nil
+        doom-one-brighter-comments nil
+        doom-one-brighter-modeline nil)
   :config
   (mapc #'disable-theme custom-enabled-themes)
-  (load-theme 'solarized-dark :no-confirm))
+  (load-theme 'doom-one :no-confirm)
+  (doom-themes-org-config))
 
 ;;; terminal
 (use-package vterm
