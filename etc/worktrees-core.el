@@ -83,13 +83,13 @@ When nil, interrupts are sent back-to-back with no delay."
   :type 'string
   :group 'vibemacs-worktrees)
 
-(defcustom vibemacs-worktrees-startup-frame-size '(160 . 52)
+(defcustom vibemacs-worktrees-startup-frame-size '(196 . 58)
   "Width and height (in characters) to apply to the first vibemacs frame.
 Set to nil to keep the default frame size."
   :type '(choice (const :tag "Leave default" nil)
                  (cons :tag "Width × Height"
-                       (integer :tag "Columns" :value 160)
-                       (integer :tag "Rows" :value 52)))
+                       (integer :tag "Columns" :value 196)
+                       (integer :tag "Rows" :value 58)))
   :group 'vibemacs-worktrees)
 
 (defcustom vibemacs-worktrees-startup-layout t
