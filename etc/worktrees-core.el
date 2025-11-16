@@ -97,14 +97,14 @@ Set to nil to keep the default frame size."
   :type 'boolean
   :group 'vibemacs-worktrees)
 
-(defcustom vibemacs-worktrees-startup-left-width 30
+(defcustom vibemacs-worktrees-startup-left-width 24
   "Preferred width in columns for the dashboard pane at startup.
 When nil, derive the width from the frame size."
   :type '(choice (const :tag "Automatic" nil)
                  (integer :tag "Columns"))
   :group 'vibemacs-worktrees)
 
-(defcustom vibemacs-worktrees-startup-right-width 60
+(defcustom vibemacs-worktrees-startup-right-width 48
   "Preferred width in columns for the git status sidebar at startup.
 When nil, derive the width from the frame size."
   :type '(choice (const :tag "Automatic" nil)
