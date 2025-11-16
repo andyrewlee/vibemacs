@@ -1,6 +1,6 @@
 # vibemacs
 
-emacs config for running multiple codex, claude code and gemini agents in parallel.
+Emacs config for running multiple Codex, Claude Code and Gemini agents in parallel.
 
 ## Setup
 
