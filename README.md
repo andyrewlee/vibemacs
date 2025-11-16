@@ -15,3 +15,11 @@ For custom setup scripts when creating worktrees, add a `worktrees.json` file:
   ]
 }
 ```
+
+## Directory Structure
+
+Worktrees are created under `~/.vibemacs/worktrees/<repo-name>/`:
+
+- **Worktrees**: `~/.vibemacs/worktrees/<repo-name>/<worktree-name>/`
+- **Metadata**: `~/.vibemacs/worktrees-metadata/<hash>/worktree.json`
+- **Registry**: `~/.vibemacs/worktrees.json`
