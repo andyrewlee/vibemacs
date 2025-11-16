@@ -21,5 +21,5 @@ For custom setup scripts when creating worktrees, add a `worktrees.json` file:
 Worktrees are created under `~/.vibemacs/worktrees/$REPO_NAME/`:
 
 - **Worktrees**: `~/.vibemacs/worktrees/<repo-name>/<worktree-name>/`
+- **Metadata**: `~/.vibemacs/worktrees-metadata/<hash>/worktree.json`
 - **Registry**: `~/.vibemacs/worktrees.json`
-- **Metadata**: `~/.vibemacs/metadata/<repo-hash>/<worktree-name>/metadata.json`
