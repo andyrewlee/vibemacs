@@ -104,7 +104,7 @@ When nil, derive the width from the frame size."
                  (integer :tag "Columns"))
   :group 'vibemacs-worktrees)
 
-(defcustom vibemacs-worktrees-startup-right-width 48
+(defcustom vibemacs-worktrees-startup-right-width 72
   "Preferred width in columns for the git status sidebar at startup.
 When nil, derive the width from the frame size."
   :type '(choice (const :tag "Automatic" nil)
