@@ -9,6 +9,7 @@
 (require 'worktrees-registry)
 (require 'worktrees-metadata)
 (require 'cl-lib)
+(require 'seq)
 
 (declare-function vterm "vterm")
 (declare-function vterm-send-string "vterm")
