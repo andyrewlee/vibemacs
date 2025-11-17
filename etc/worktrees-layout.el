@@ -25,6 +25,22 @@
 
 ;;; Center Pane Management
 
+(defun vibemacs-worktrees--configure-center-buffer (window)
+  "Configure tab-line for any buffer displayed in center WINDOW.
+This ensures file buffers and agent buffers all use the worktree-scoped tab-line."
+  (when (and (window-live-p window)
+             (eq window vibemacs-worktrees--center-window))
+    (with-current-buffer (window-buffer window)
+      ;; Configure tab-line for all buffers in the center window
+      (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+      ;; Store the worktree root for tab scoping
+      (setq-local vibemacs-worktrees--buffer-root
+                  (when-let ((entry (window-parameter window 'vibemacs-center-entry)))
+                    (vibemacs-worktrees--entry-root entry)))
+      ;; Enable tab-line-mode
+      (unless tab-line-mode
+        (tab-line-mode 1)))))
+
 (defun vibemacs-worktrees--right-terminal-buffer (entry)
   "Return or create a terminal buffer for ENTRY in the right sidebar."
   (let* ((name (vibemacs-worktrees--entry-name entry))
@@ -99,6 +115,12 @@ When ENTRY is nil, reuse the currently active worktree."
         (set-window-parameter window 'vibemacs-tab-order nil))
       (set-window-parameter window 'vibemacs-center-entry entry)
       (set-window-parameter window 'vibemacs-center-active 'chat)
+      ;; Install hook to configure tab-line for all buffers in this window
+      (unless (memq 'vibemacs-worktrees--configure-center-buffer
+                    (window-parameter window 'window-buffer-change-functions))
+        (set-window-parameter window 'window-buffer-change-functions
+                              (cons 'vibemacs-worktrees--configure-center-buffer
+                                    (window-parameter window 'window-buffer-change-functions))))
       (with-selected-window window
         (let ((buffer (vibemacs-worktrees--chat-buffer entry)))
           (when buffer
@@ -266,6 +288,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                 (setq vibemacs-worktrees--center-window right-window)
                 (setq vibemacs-worktrees--right-window (or git-status-window left-window))
                 (setq vibemacs-worktrees--terminal-window terminal-window)
+                ;; Install hook to configure tab-line for all buffers in center window
+                (when right-window
+                  (set-window-parameter right-window 'window-buffer-change-functions
+                                        (list 'vibemacs-worktrees--configure-center-buffer)))
                 (when entry
                   (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
                   (vibemacs-worktrees-dashboard--activate entry)
@@ -306,6 +332,10 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
             (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
             (setq vibemacs-worktrees--center-window center-window)
             (setq vibemacs-worktrees--right-window nil)
+            ;; Install hook to configure tab-line for all buffers in center window
+            (when center-window
+              (set-window-parameter center-window 'window-buffer-change-functions
+                                    (list 'vibemacs-worktrees--configure-center-buffer)))
             (when entry
               (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
               (vibemacs-worktrees-dashboard--activate entry)
