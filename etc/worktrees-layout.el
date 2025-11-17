@@ -95,7 +95,8 @@ When ENTRY is nil, reuse the currently active worktree."
       (with-selected-window window
         (let ((buffer (vibemacs-worktrees--chat-buffer entry)))
           (when buffer
-            (set-window-buffer window buffer)
+            ;; Use switch-to-buffer to preserve window buffer history for tab-line
+            (switch-to-buffer buffer nil t)
             (dolist (win (get-buffer-window-list buffer nil t))
               (unless (eq win window)
                 (delete-window win))))))

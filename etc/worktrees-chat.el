@@ -72,6 +72,9 @@ ASSISTANT is the identifier configured for the chat session."
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
         (setq-local vibemacs-worktrees--chat-assistant assistant)
+        ;; Configure tab-line for worktree chat buffers
+        (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+        (tab-line-mode 1)
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
@@ -127,14 +130,15 @@ Prompts for agent selection and launches it in a new vterm buffer."
 
 (defun vibemacs-worktrees--agent-tab-line-tabs ()
   "Return list of buffers to show in tab-line for agent windows.
-Only shows file buffers and agent buffers, filtering out dashboard and other special buffers."
+Only shows file buffers, agent buffers, and worktree chat buffers."
   (let* ((window (selected-window))
          (buffers (window-prev-buffers window)))
-    ;; Filter to only show file buffers and agent buffers
+    ;; Filter to only show file buffers, agent buffers, and worktree chat buffers
     (seq-filter (lambda (buf)
                   (with-current-buffer buf
                     (or (buffer-file-name)
-                        (string-match-p "\\*vibemacs Agent" (buffer-name)))))
+                        (string-match-p "\\*vibemacs Agent" (buffer-name))
+                        (string-match-p "\\*vibemacs Chat" (buffer-name)))))
                 (cons (current-buffer)
                       (mapcar #'car buffers)))))
 

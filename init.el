@@ -89,10 +89,11 @@ Falls back to default evil-quit for special buffers."
   (interactive)
   (if (and (bound-and-true-p tab-line-mode)
            (or (buffer-file-name)
-               ;; Also handle agent/vterm buffers
+               ;; Also handle agent and chat buffers
                (string-match-p "\\*vibemacs Agent" (buffer-name))
+               (string-match-p "\\*vibemacs Chat" (buffer-name))
                (derived-mode-p 'vterm-mode)))
-      ;; If tab-line is active and we're in a file or agent buffer, just kill the buffer
+      ;; If tab-line is active and we're in a file, agent, or chat buffer, just kill the buffer
       (kill-buffer)
     ;; Otherwise use default evil quit behavior
     (evil-quit)))
