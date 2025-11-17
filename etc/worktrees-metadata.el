@@ -57,7 +57,8 @@
                     (cons 'prompt nil)
                     (cons 'response nil)
                     (cons 'files nil)))
-    (codex-log . ())))
+    (codex-log . ())
+    (last-active-buffer-name . nil)))
 
 (defun vibemacs-worktrees--save-metadata (entry metadata)
   "Persist METADATA for worktree ENTRY."
@@ -136,6 +137,21 @@
   "Return the scripts alist from METADATA."
   (or (alist-get 'scripts metadata)
       '((setup . "") (run . "") (archive . ""))))
+
+;;; Tab State Management
+
+(defun vibemacs-worktrees--save-last-active-buffer (entry buffer-name)
+  "Save BUFFER-NAME as the last active buffer for worktree ENTRY."
+  (when entry
+    (let ((metadata (vibemacs-worktrees--ensure-metadata entry)))
+      (setf (alist-get 'last-active-buffer-name metadata) buffer-name)
+      (vibemacs-worktrees--save-metadata entry metadata))))
+
+(defun vibemacs-worktrees--get-last-active-buffer-name (entry)
+  "Get the last active buffer name for worktree ENTRY, or nil if none."
+  (when entry
+    (let ((metadata (vibemacs-worktrees--ensure-metadata entry)))
+      (alist-get 'last-active-buffer-name metadata))))
 
 (provide 'worktrees-metadata)
 ;;; worktrees-metadata.el ends here

@@ -87,21 +87,38 @@ When ENTRY is nil, reuse the currently active worktree."
                      vibemacs-worktrees--center-window
                    (selected-window)))
          (previous-entry (when (window-live-p window)
-                          (window-parameter window 'vibemacs-center-entry))))
+                          (window-parameter window 'vibemacs-center-entry)))
+         (switching-worktrees (and previous-entry
+                                   (not (equal (vibemacs-worktrees--entry-root entry)
+                                             (vibemacs-worktrees--entry-root previous-entry))))))
     (unless entry
       (user-error "Select a worktree to view chat"))
     (if (not (window-live-p window))
         (message "Center pane not initialised yet.")
       (setq vibemacs-worktrees--center-window window)
+
+      ;; Save current buffer name when switching away from previous worktree
+      (when (and switching-worktrees previous-entry)
+        (with-selected-window window
+          (when (buffer-live-p (current-buffer))
+            (vibemacs-worktrees--save-last-active-buffer
+             previous-entry
+             (buffer-name (current-buffer))))))
+
       ;; Reset tab order when switching to a different worktree
-      (when (and previous-entry
-                 (not (equal (vibemacs-worktrees--entry-root entry)
-                            (vibemacs-worktrees--entry-root previous-entry))))
+      (when switching-worktrees
         (set-window-parameter window 'vibemacs-tab-order nil))
+
       (set-window-parameter window 'vibemacs-center-entry entry)
       (set-window-parameter window 'vibemacs-center-active 'chat)
+
       (with-selected-window window
-        (let ((buffer (vibemacs-worktrees--chat-buffer entry)))
+        ;; Try to restore last active buffer, fall back to chat
+        (let* ((last-buffer-name (vibemacs-worktrees--get-last-active-buffer-name entry))
+               (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
+               (buffer (if (buffer-live-p last-buffer)
+                          last-buffer
+                        (vibemacs-worktrees--chat-buffer entry))))
           (when buffer
             ;; Use switch-to-buffer to preserve window buffer history for tab-line
             (switch-to-buffer buffer nil t)
