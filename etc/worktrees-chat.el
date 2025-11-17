@@ -19,6 +19,7 @@
 (defvar vterm-mode-map)
 
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
+(declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 
 ;;; Chat Buffer Management
 
@@ -72,6 +73,8 @@ ASSISTANT is the identifier configured for the chat session."
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
         (setq-local vibemacs-worktrees--chat-assistant assistant)
+        ;; Store the worktree root for tab scoping
+        (setq-local vibemacs-worktrees--buffer-root root)
         ;; Configure tab-line for worktree chat buffers
         (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
         (tab-line-mode 1)
@@ -90,14 +93,16 @@ ASSISTANT is the identifier configured for the chat session."
 Prompts for agent selection and launches it in a new vterm buffer."
   (interactive)
   (vibemacs-worktrees--ensure-vterm)
-  ;; Get available assistants from customization
-  (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+  ;; Get the current worktree entry for scoping
+  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
+         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
+         (assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
          (agent (completing-read "Select agent: " assistants nil t))
          (command (vibemacs-worktrees--assistant-command agent))
          ;; Generate unique buffer name
          (base-name (format "*vibemacs Agent %s*" agent))
          (buffer-name (generate-new-buffer-name base-name))
-         (default-directory (or default-directory "~")))
+         (default-directory (or current-root default-directory "~")))
     (when (or (null command) (string-empty-p command))
       (user-error "No command configured for agent: %s" agent))
     ;; Create the vterm buffer without switching to it first
@@ -114,6 +119,8 @@ Prompts for agent selection and launches it in a new vterm buffer."
             (setq-local vibemacs-worktrees--chat-program command)
             (setq-local vibemacs-worktrees--chat-assistant agent)
             (setq-local vibemacs-worktrees--chat-command-started nil)
+            ;; Store the worktree root for tab scoping
+            (setq-local vibemacs-worktrees--buffer-root current-root)
             ;; Launch the agent command
             (when-let ((proc (get-buffer-process buffer)))
               (vterm-send-string command)
@@ -130,15 +137,29 @@ Prompts for agent selection and launches it in a new vterm buffer."
 
 (defun vibemacs-worktrees--agent-tab-line-tabs ()
   "Return list of buffers to show in tab-line for agent windows.
-Only shows file buffers, agent buffers, and worktree chat buffers."
+Only shows file buffers, agent buffers, and worktree chat buffers that belong to the current worktree."
   (let* ((window (selected-window))
-         (buffers (window-prev-buffers window)))
-    ;; Filter to only show file buffers, agent buffers, and worktree chat buffers
+         (buffers (window-prev-buffers window))
+         ;; Get the current worktree root from window parameter
+         (current-entry (window-parameter window 'vibemacs-center-entry))
+         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry))))
+    ;; Filter to only show buffers from the current worktree
     (seq-filter (lambda (buf)
                   (with-current-buffer buf
-                    (or (buffer-file-name)
-                        (string-match-p "\\*vibemacs Agent" (buffer-name))
-                        (string-match-p "\\*vibemacs Chat" (buffer-name)))))
+                    (cond
+                     ;; File buffers: check if file is in current worktree directory
+                     ((buffer-file-name)
+                      (and current-root
+                           (string-prefix-p current-root (buffer-file-name))))
+                     ;; Agent/chat buffers: check if they belong to current worktree
+                     ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                          (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                      (and (boundp 'vibemacs-worktrees--buffer-root)
+                           vibemacs-worktrees--buffer-root
+                           current-root
+                           (string= vibemacs-worktrees--buffer-root current-root)))
+                     ;; Don't show other buffers
+                     (t nil))))
                 (cons (current-buffer)
                       (mapcar #'car buffers)))))
 
