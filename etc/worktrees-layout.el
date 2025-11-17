@@ -84,18 +84,26 @@ When ENTRY is nil, reuse the currently active worktree."
   (let* ((entry (or entry (vibemacs-worktrees-center--current-entry)))
          (window (if (window-live-p vibemacs-worktrees--center-window)
                      vibemacs-worktrees--center-window
-                   (selected-window))))
+                   (selected-window)))
+         (previous-entry (when (window-live-p window)
+                          (window-parameter window 'vibemacs-center-entry))))
     (unless entry
       (user-error "Select a worktree to view chat"))
     (if (not (window-live-p window))
         (message "Center pane not initialised yet.")
       (setq vibemacs-worktrees--center-window window)
+      ;; Reset tab order when switching to a different worktree
+      (when (and previous-entry
+                 (not (equal (vibemacs-worktrees--entry-root entry)
+                            (vibemacs-worktrees--entry-root previous-entry))))
+        (set-window-parameter window 'vibemacs-tab-order nil))
       (set-window-parameter window 'vibemacs-center-entry entry)
       (set-window-parameter window 'vibemacs-center-active 'chat)
       (with-selected-window window
         (let ((buffer (vibemacs-worktrees--chat-buffer entry)))
           (when buffer
-            (set-window-buffer window buffer)
+            ;; Use switch-to-buffer to preserve window buffer history for tab-line
+            (switch-to-buffer buffer nil t)
             (dolist (win (get-buffer-window-list buffer nil t))
               (unless (eq win window)
                 (delete-window win))))))

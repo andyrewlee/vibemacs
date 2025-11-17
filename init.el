@@ -88,8 +88,12 @@ Returns non-nil on success, nil on failure."
 Falls back to default evil-quit for special buffers."
   (interactive)
   (if (and (bound-and-true-p tab-line-mode)
-           (buffer-file-name))
-      ;; If tab-line is active and we're in a file buffer, just kill the buffer
+           (or (buffer-file-name)
+               ;; Also handle agent and chat buffers
+               (string-match-p "\\*vibemacs Agent" (buffer-name))
+               (string-match-p "\\*vibemacs Chat" (buffer-name))
+               (derived-mode-p 'vterm-mode)))
+      ;; If tab-line is active and we're in a file, agent, or chat buffer, just kill the buffer
       (kill-buffer)
     ;; Otherwise use default evil quit behavior
     (evil-quit)))
@@ -144,6 +148,7 @@ Falls back to default evil-quit for special buffers."
     "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
     "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
     "ve"   '(vibemacs-worktrees-chat-send-escape  :which-key "send ESC to chat")
+    "vn"   '(vibemacs-worktrees-new-agent-tab     :which-key "new agent tab")
     "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
     ;; git
     "g."   '(magit-dispatch                      :which-key "menu")

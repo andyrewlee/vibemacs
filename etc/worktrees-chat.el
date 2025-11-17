@@ -19,6 +19,7 @@
 (defvar vterm-mode-map)
 
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
+(declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 
 ;;; Chat Buffer Management
 
@@ -72,6 +73,11 @@ ASSISTANT is the identifier configured for the chat session."
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
         (setq-local vibemacs-worktrees--chat-assistant assistant)
+        ;; Store the worktree root for tab scoping
+        (setq-local vibemacs-worktrees--buffer-root root)
+        ;; Configure tab-line for worktree chat buffers
+        (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+        (tab-line-mode 1)
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
@@ -81,6 +87,104 @@ ASSISTANT is the identifier configured for the chat session."
     buffer))
 
 ;;; Interactive Commands
+
+(defun vibemacs-worktrees-new-agent-tab ()
+  "Create a new tab with a selected AI agent (codex, claude, or gemini).
+Prompts for agent selection and launches it in a new vterm buffer."
+  (interactive)
+  (vibemacs-worktrees--ensure-vterm)
+  ;; Get the current worktree entry for scoping
+  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
+         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
+         (assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+         (agent (completing-read "Select agent: " assistants nil t))
+         (command (vibemacs-worktrees--assistant-command agent))
+         ;; Generate unique buffer name
+         (base-name (format "*vibemacs Agent %s*" agent))
+         (buffer-name (generate-new-buffer-name base-name))
+         (default-directory (or current-root default-directory "~")))
+    (when (or (null command) (string-empty-p command))
+      (user-error "No command configured for agent: %s" agent))
+    ;; Create the vterm buffer without switching to it first
+    (let* ((vterm-buffer-name buffer-name)
+           (original-buffer (current-buffer))
+           buffer)
+      ;; Create vterm in background
+      (save-window-excursion
+        (vterm)
+        (setq buffer (get-buffer buffer-name))
+        (when buffer
+          (with-current-buffer buffer
+            (setq-local header-line-format nil)
+            (setq-local vibemacs-worktrees--chat-program command)
+            (setq-local vibemacs-worktrees--chat-assistant agent)
+            (setq-local vibemacs-worktrees--chat-command-started nil)
+            ;; Store the worktree root for tab scoping
+            (setq-local vibemacs-worktrees--buffer-root current-root)
+            ;; Launch the agent command
+            (when-let ((proc (get-buffer-process buffer)))
+              (vterm-send-string command)
+              (vterm-send-return)
+              (setq-local vibemacs-worktrees--chat-command-started t)))))
+      ;; Now display the buffer in the center window
+      (when buffer
+        (if (window-live-p vibemacs-worktrees--center-window)
+            (with-selected-window vibemacs-worktrees--center-window
+              (switch-to-buffer buffer)
+              ;; Configure tab-line to only show file and agent buffers
+              (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+              ;; Enable tab-line-mode so it shows as a tab
+              (tab-line-mode 1))
+          ;; Fallback if center window doesn't exist
+          (switch-to-buffer buffer)
+          (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+          (tab-line-mode 1)))
+      (message "Launched %s in new tab" agent))))
+
+(defun vibemacs-worktrees--agent-tab-line-tabs ()
+  "Return list of buffers to show in tab-line for agent windows.
+Only shows file buffers, agent buffers, and worktree chat buffers that belong to the current worktree."
+  (let* ((window (selected-window))
+         ;; Get the current worktree root from window parameter
+         (current-entry (window-parameter window 'vibemacs-center-entry))
+         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
+         (current-buf (current-buffer))
+         ;; Get or initialize the ordered tab list for this worktree
+         (tab-order (window-parameter window 'vibemacs-tab-order)))
+
+    ;; Add current buffer to tab order if not already there
+    (unless (member current-buf tab-order)
+      (setq tab-order (append tab-order (list current-buf)))
+      (set-window-parameter window 'vibemacs-tab-order tab-order))
+
+    ;; Clean up dead buffers from tab-order and persist
+    (let ((cleaned-order (seq-filter #'buffer-live-p tab-order)))
+      (unless (equal cleaned-order tab-order)
+        (setq tab-order cleaned-order)
+        (set-window-parameter window 'vibemacs-tab-order tab-order)))
+
+    ;; Filter to only show buffers from the current worktree, preserving order
+    (seq-filter (lambda (buf)
+                  (and (buffer-live-p buf)
+                       (with-current-buffer buf
+                         (cond
+                          ;; File buffers: check if file is in current worktree directory
+                          ((buffer-file-name)
+                           (or (not current-root)  ; If no current root, show all files
+                               (let ((file-path (expand-file-name (buffer-file-name)))
+                                     (root-path (file-name-as-directory (expand-file-name current-root))))
+                                 (string-prefix-p root-path file-path))))
+                          ;; Agent/chat buffers: check if they belong to current worktree
+                          ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                               (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                           (or (not current-root)  ; If no current root, show all agent/chat buffers
+                               (and (boundp 'vibemacs-worktrees--buffer-root)
+                                    vibemacs-worktrees--buffer-root
+                                    (string= (expand-file-name vibemacs-worktrees--buffer-root)
+                                            (expand-file-name current-root)))))
+                          ;; Don't show other buffers
+                          (t nil)))))
+                tab-order)))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
