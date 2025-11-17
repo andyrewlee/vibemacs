@@ -97,9 +97,8 @@ Prompts for agent selection and launches it in a new vterm buffer."
          (default-directory (or default-directory "~")))
     (when (or (null command) (string-empty-p command))
       (user-error "No command configured for agent: %s" agent))
-    ;; Create the vterm buffer
-    (let ((vterm-buffer-name buffer-name)
-          (display-buffer-overriding-action '(display-buffer-same-window)))
+    ;; Create the vterm buffer as a new tab
+    (let ((vterm-buffer-name buffer-name))
       (vterm)
       (let ((buffer (get-buffer buffer-name)))
         (when buffer
