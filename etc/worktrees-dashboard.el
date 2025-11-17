@@ -450,13 +450,15 @@ HELP overrides the default hover tooltip."
     buffer))
 
 (defun vibemacs-worktrees-git-status-open-file ()
-  "Open the file at point in the center window."
+  "Open the file at point in a new tab in the center window."
   (interactive)
   (when-let* ((entry (vibemacs-worktrees-center--current-entry))
               (root (vibemacs-worktrees--entry-root entry))
               (file (get-text-property (point) 'vibemacs-file-path)))
     (when (and file (window-live-p vibemacs-worktrees--center-window))
       (with-selected-window vibemacs-worktrees--center-window
+        ;; Create a new tab and open the file in it
+        (tab-bar-new-tab)
         (find-file (expand-file-name file root))))))
 
 (defun vibemacs-worktrees-git-status-refresh ()
