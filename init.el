@@ -60,10 +60,10 @@ Returns non-nil on success, nil on failure."
       inhibit-startup-screen t
       require-final-newline t
       use-short-answers t)
-;; Enable tab-line mode for window-level file tabs
-(global-tab-line-mode 1)
+;; Enable tab-line mode only for file buffers (not special buffers)
 (setq tab-line-close-button-show nil  ;; Hide close buttons for cleaner look
       tab-line-new-button-show nil)   ;; Hide new tab button
+(add-hook 'find-file-hook 'tab-line-mode)
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
 (add-hook 'before-save-hook 'delete-trailing-whitespace)
