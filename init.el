@@ -60,6 +60,10 @@ Returns non-nil on success, nil on failure."
       inhibit-startup-screen t
       require-final-newline t
       use-short-answers t)
+;; Enable tab-line mode only for file buffers (not special buffers)
+(setq tab-line-close-button-show nil  ;; Hide close buttons for cleaner look
+      tab-line-new-button-show nil)   ;; Hide new tab button
+(add-hook 'find-file-hook 'tab-line-mode)
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
 (add-hook 'before-save-hook 'delete-trailing-whitespace)
@@ -75,7 +79,21 @@ Returns non-nil on success, nil on failure."
         evil-want-keybinding nil)
   :config
   ;; enable globally
-  (evil-mode 1))
+  (evil-mode 1)
+  ;; Custom :q that closes buffer instead of window (for tab-line mode)
+  (evil-ex-define-cmd "q[uit]" 'vibemacs-evil-quit))
+
+(defun vibemacs-evil-quit ()
+  "Close buffer instead of window when using :q with tab-line-mode.
+Falls back to default evil-quit for special buffers."
+  (interactive)
+  (if (and (bound-and-true-p tab-line-mode)
+           (buffer-file-name))
+      ;; If tab-line is active and we're in a file buffer, just kill the buffer
+      (kill-buffer)
+    ;; Otherwise use default evil quit behavior
+    (evil-quit)))
+
 (use-package evil-collection
   :after evil
   :config
@@ -146,6 +164,10 @@ Returns non-nil on success, nil on failure."
     "wl"   '(windmove-right                      :which-key "move to right rindow")
     "wh"   '(windmove-left                       :which-key "move to left window")
     "wj"   '(windmove-down                       :which-key "move to bottom window")
+    ;; tabs
+    "tn"   '(tab-line-switch-to-next-tab         :which-key "next tab")
+    "tp"   '(tab-line-switch-to-prev-tab         :which-key "previous tab")
+    "tc"   '(kill-buffer                         :which-key "close buffer")
     ;; buffer
     "be"   '(eval-buffer                         :which-key "eval buffer")
     "bn"   '(next-buffer                         :which-key "next buffer")
