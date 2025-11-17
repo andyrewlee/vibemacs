@@ -97,10 +97,14 @@ Prompts for agent selection and launches it in a new vterm buffer."
          (default-directory (or default-directory "~")))
     (when (or (null command) (string-empty-p command))
       (user-error "No command configured for agent: %s" agent))
-    ;; Create the vterm buffer as a new tab
-    (let ((vterm-buffer-name buffer-name))
-      (vterm)
-      (let ((buffer (get-buffer buffer-name)))
+    ;; Create the vterm buffer without switching to it first
+    (let* ((vterm-buffer-name buffer-name)
+           (original-buffer (current-buffer))
+           buffer)
+      ;; Create vterm in background
+      (save-window-excursion
+        (vterm)
+        (setq buffer (get-buffer buffer-name))
         (when buffer
           (with-current-buffer buffer
             (setq-local header-line-format nil)
@@ -111,8 +115,13 @@ Prompts for agent selection and launches it in a new vterm buffer."
             (when-let ((proc (get-buffer-process buffer)))
               (vterm-send-string command)
               (vterm-send-return)
-              (setq-local vibemacs-worktrees--chat-command-started t))))))
-    (message "Launched %s in new tab" agent)))
+              (setq-local vibemacs-worktrees--chat-command-started t)))))
+      ;; Now display the buffer in a new tab
+      (when buffer
+        (switch-to-buffer buffer)
+        ;; Enable tab-line-mode so it shows as a tab
+        (tab-line-mode 1))
+      (message "Launched %s in new tab" agent))))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
