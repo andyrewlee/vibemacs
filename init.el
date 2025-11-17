@@ -88,8 +88,11 @@ Returns non-nil on success, nil on failure."
 Falls back to default evil-quit for special buffers."
   (interactive)
   (if (and (bound-and-true-p tab-line-mode)
-           (buffer-file-name))
-      ;; If tab-line is active and we're in a file buffer, just kill the buffer
+           (or (buffer-file-name)
+               ;; Also handle agent/vterm buffers
+               (string-match-p "\\*vibemacs Agent" (buffer-name))
+               (derived-mode-p 'vterm-mode)))
+      ;; If tab-line is active and we're in a file or agent buffer, just kill the buffer
       (kill-buffer)
     ;; Otherwise use default evil quit behavior
     (evil-quit)))

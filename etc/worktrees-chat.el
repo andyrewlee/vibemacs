@@ -119,9 +119,24 @@ Prompts for agent selection and launches it in a new vterm buffer."
       ;; Now display the buffer in a new tab
       (when buffer
         (switch-to-buffer buffer)
+        ;; Configure tab-line to only show file and agent buffers
+        (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
         ;; Enable tab-line-mode so it shows as a tab
         (tab-line-mode 1))
       (message "Launched %s in new tab" agent))))
+
+(defun vibemacs-worktrees--agent-tab-line-tabs ()
+  "Return list of buffers to show in tab-line for agent windows.
+Only shows file buffers and agent buffers, filtering out dashboard and other special buffers."
+  (let* ((window (selected-window))
+         (buffers (window-prev-buffers window)))
+    ;; Filter to only show file buffers and agent buffers
+    (seq-filter (lambda (buf)
+                  (with-current-buffer buf
+                    (or (buffer-file-name)
+                        (string-match-p "\\*vibemacs Agent" (buffer-name)))))
+                (cons (current-buffer)
+                      (mapcar #'car buffers)))))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
