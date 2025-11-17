@@ -79,7 +79,21 @@ Returns non-nil on success, nil on failure."
         evil-want-keybinding nil)
   :config
   ;; enable globally
-  (evil-mode 1))
+  (evil-mode 1)
+  ;; Custom :q that closes buffer instead of window (for tab-line mode)
+  (evil-ex-define-cmd "q[uit]" 'vibemacs-evil-quit))
+
+(defun vibemacs-evil-quit ()
+  "Close buffer instead of window when using :q with tab-line-mode.
+Falls back to default evil-quit for special buffers."
+  (interactive)
+  (if (and (bound-and-true-p tab-line-mode)
+           (buffer-file-name))
+      ;; If tab-line is active and we're in a file buffer, just kill the buffer
+      (kill-buffer)
+    ;; Otherwise use default evil quit behavior
+    (evil-quit)))
+
 (use-package evil-collection
   :after evil
   :config
