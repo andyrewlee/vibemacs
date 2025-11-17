@@ -172,6 +172,9 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 (defvar vibemacs-worktrees--center-window nil
   "Window used for the central chat/terminal pane.")
 
+(defvar vibemacs-worktrees--dashboard-window nil
+  "Window showing the dashboard (tabulated list of worktrees).")
+
 (defvar vibemacs-worktrees--right-window nil
   "Window used for the right sidebar showing git status.")
 
@@ -180,6 +183,9 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 
 (defvar vibemacs-worktrees--transcript-buffers (make-hash-table :test 'equal)
   "Hash table mapping worktree roots to transcript buffers.")
+
+(defvar vibemacs-worktrees--tab-orders (make-hash-table :test 'equal)
+  "Per-worktree buffer order used for tab-line in the center pane.")
 
 (defvar vibemacs-worktrees--startup-applied nil
   "Whether the vibemacs startup layout has already been applied this session.")
