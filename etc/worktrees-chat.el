@@ -139,34 +139,37 @@ Prompts for agent selection and launches it in a new vterm buffer."
   "Return list of buffers to show in tab-line for agent windows.
 Only shows file buffers, agent buffers, and worktree chat buffers that belong to the current worktree."
   (let* ((window (selected-window))
-         (buffers (window-prev-buffers window))
          ;; Get the current worktree root from window parameter
          (current-entry (window-parameter window 'vibemacs-center-entry))
          (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
-         (current-buf (current-buffer)))
-    ;; Collect all buffers: previous buffers + current buffer at the end
-    ;; This preserves the original order and adds current buffer if new
-    (let ((all-buffers (delete-dups
-                        (append (mapcar #'car buffers)
-                                (list current-buf)))))
-      ;; Filter to only show buffers from the current worktree
-      (seq-filter (lambda (buf)
-                    (with-current-buffer buf
-                      (cond
-                       ;; File buffers: check if file is in current worktree directory
-                       ((buffer-file-name)
-                        (and current-root
-                             (string-prefix-p current-root (buffer-file-name))))
-                       ;; Agent/chat buffers: check if they belong to current worktree
-                       ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
-                            (string-match-p "\\*vibemacs Chat" (buffer-name)))
-                        (and (boundp 'vibemacs-worktrees--buffer-root)
-                             vibemacs-worktrees--buffer-root
-                             current-root
-                             (string= vibemacs-worktrees--buffer-root current-root)))
-                       ;; Don't show other buffers
-                       (t nil))))
-                  all-buffers))))
+         (current-buf (current-buffer))
+         ;; Get or initialize the ordered tab list for this worktree
+         (tab-order (window-parameter window 'vibemacs-tab-order)))
+
+    ;; Add current buffer to tab order if not already there
+    (unless (member current-buf tab-order)
+      (setq tab-order (append tab-order (list current-buf)))
+      (set-window-parameter window 'vibemacs-tab-order tab-order))
+
+    ;; Filter to only show buffers from the current worktree, preserving order
+    (seq-filter (lambda (buf)
+                  (and (buffer-live-p buf)
+                       (with-current-buffer buf
+                         (cond
+                          ;; File buffers: check if file is in current worktree directory
+                          ((buffer-file-name)
+                           (and current-root
+                                (string-prefix-p current-root (buffer-file-name))))
+                          ;; Agent/chat buffers: check if they belong to current worktree
+                          ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                               (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                           (and (boundp 'vibemacs-worktrees--buffer-root)
+                                vibemacs-worktrees--buffer-root
+                                current-root
+                                (string= vibemacs-worktrees--buffer-root current-root)))
+                          ;; Don't show other buffers
+                          (t nil)))))
+                tab-order)))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
