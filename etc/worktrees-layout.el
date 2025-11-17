@@ -2,6 +2,7 @@
 
 ;;; Commentary:
 ;; Window layout management and center pane tab switching.
+;; Three-pane layout: left = git status + sidebar terminal, middle = dashboard, right = chat/diff/terminal tab.
 
 ;;; Code:
 
@@ -220,38 +221,39 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                  (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
                  (right-width (max min-left (min max-left desired-right)))
                  (new-left (split-window root-window right-width 'left))
-                 (left-window (if (< (window-total-width new-left) (window-total-width root-window))
-                                  new-left
-                                root-window))
-                 (center-window (if (< (window-total-width new-left) (window-total-width root-window))
-                                    root-window
-                                  new-left))
-                 (actual-center-width (window-total-width center-window))
+                 (dashboard-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                       new-left
+                                     root-window))
+                 (chat-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                  root-window
+                                new-left))
+                 (actual-center-width (window-total-width chat-window))
                  (can-split-right (>= actual-center-width (+ min-center min-right)))
-                 (right-window nil)
+                 (status-window nil)
                  (git-status-window nil)
                  (terminal-window nil))
             (when can-split-right
-              (setq right-window (split-window center-window (- left-width) 'right))
-              ;; Split left-window (git status) horizontally to add terminal at bottom
-              (when left-window
-                (setq git-status-window (split-window left-window nil 'above))
-                (setq terminal-window left-window)))
+              (setq status-window (split-window chat-window (- left-width) 'right))
+              ;; Split dashboard-window (git status) horizontally to add terminal at bottom
+              (when dashboard-window
+                (setq git-status-window (split-window dashboard-window nil 'above))
+                (setq terminal-window dashboard-window)))
             (let ((entries (vibemacs-worktrees--entries-safe)))
               (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
                                         :key #'vibemacs-worktrees--entry-root
                                         :test #'string=)
                                (car entries))))
-                (set-window-buffer center-window dashboard-buffer)
-                (let ((delta (- left-width (window-total-width center-window))))
+                ;; dashboard buffer (currently rendered in chat-window/middle pane)
+                (set-window-buffer chat-window dashboard-buffer)
+                (let ((delta (- left-width (window-total-width chat-window))))
                   (when (/= delta 0)
-                    (window-resize center-window delta t)))
-                (set-window-dedicated-p center-window t)
-                (set-window-parameter center-window 'window-size-fixed 'width)
-                (set-window-parameter center-window 'no-delete-other-windows t)
-                (set-window-parameter center-window 'window-preserved-size (cons 'width left-width))
-                (when right-window
-                  (let ((status-win (or git-status-window left-window)))
+                    (window-resize chat-window delta t)))
+                (set-window-dedicated-p chat-window t)
+                (set-window-parameter chat-window 'window-size-fixed 'width)
+                (set-window-parameter chat-window 'no-delete-other-windows t)
+                (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
+                (when status-window
+                  (let ((status-win (or git-status-window dashboard-window)))
                     (set-window-buffer status-win git-status-buffer)
                     (set-window-dedicated-p status-win t)
                     (set-window-parameter status-win 'window-size-fixed 'width)
@@ -263,29 +265,31 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
                       (set-window-buffer terminal-window terminal-buffer)
                       (set-window-parameter terminal-window 'window-size-fixed 'width)
                       (set-window-parameter terminal-window 'no-delete-other-windows t))))
-                (setq vibemacs-worktrees--center-window right-window)
-                (setq vibemacs-worktrees--right-window (or git-status-window left-window))
+                (setq vibemacs-worktrees--center-window status-window)
+                (setq vibemacs-worktrees--right-window (or git-status-window dashboard-window))
                 (setq vibemacs-worktrees--terminal-window terminal-window)
                 (when entry
                   (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
                   (vibemacs-worktrees-dashboard--activate entry)
-                  (with-selected-window center-window
+                  (with-selected-window chat-window
                     (goto-char (point-min))
                     (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
                     (when (bound-and-true-p hl-line-mode)
                       (hl-line-highlight)))
-                  (select-window right-window)
+                  (select-window status-window)
                   (condition-case err
                       (vibemacs-worktrees-center-show-chat entry)
                     (error
                      (message "vibemacs: unable to open chat console (%s)"
                               (error-message-string err))))
                   (vibemacs-worktrees--files-refresh entry nil)
-                  (when left-window
+                  (when dashboard-window
                     (vibemacs-worktrees-git-status--populate entry)
                     (vibemacs-worktrees-git-status--start-auto-refresh)))
                 (setq applied t)
-                (select-window right-window)))))
+                ;; chat pane lives in status-window; git status/terminal stacked to its left
+                (when status-window
+                  (select-window status-window))))))
          ;; Two-column layout
          ((>= frame-width min-two-column)
           (let* ((max-left (max min-left (- frame-width min-center)))
