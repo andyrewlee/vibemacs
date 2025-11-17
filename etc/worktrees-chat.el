@@ -142,26 +142,28 @@ Only shows file buffers, agent buffers, and worktree chat buffers that belong to
          (buffers (window-prev-buffers window))
          ;; Get the current worktree root from window parameter
          (current-entry (window-parameter window 'vibemacs-center-entry))
-         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry))))
+         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
+         (current-buf (current-buffer)))
     ;; Filter to only show buffers from the current worktree
-    (seq-filter (lambda (buf)
-                  (with-current-buffer buf
-                    (cond
-                     ;; File buffers: check if file is in current worktree directory
-                     ((buffer-file-name)
-                      (and current-root
-                           (string-prefix-p current-root (buffer-file-name))))
-                     ;; Agent/chat buffers: check if they belong to current worktree
-                     ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
-                          (string-match-p "\\*vibemacs Chat" (buffer-name)))
-                      (and (boundp 'vibemacs-worktrees--buffer-root)
-                           vibemacs-worktrees--buffer-root
-                           current-root
-                           (string= vibemacs-worktrees--buffer-root current-root)))
-                     ;; Don't show other buffers
-                     (t nil))))
-                (cons (current-buffer)
-                      (mapcar #'car buffers)))))
+    (delete-dups
+     (seq-filter (lambda (buf)
+                   (with-current-buffer buf
+                     (cond
+                      ;; File buffers: check if file is in current worktree directory
+                      ((buffer-file-name)
+                       (and current-root
+                            (string-prefix-p current-root (buffer-file-name))))
+                      ;; Agent/chat buffers: check if they belong to current worktree
+                      ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                           (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                       (and (boundp 'vibemacs-worktrees--buffer-root)
+                            vibemacs-worktrees--buffer-root
+                            current-root
+                            (string= vibemacs-worktrees--buffer-root current-root)))
+                      ;; Don't show other buffers
+                      (t nil))))
+                 (cons current-buf
+                       (mapcar #'car buffers))))))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
