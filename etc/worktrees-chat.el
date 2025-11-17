@@ -82,6 +82,39 @@ ASSISTANT is the identifier configured for the chat session."
 
 ;;; Interactive Commands
 
+(defun vibemacs-worktrees-new-agent-tab ()
+  "Create a new tab with a selected AI agent (codex, claude, or gemini).
+Prompts for agent selection and launches it in a new vterm buffer."
+  (interactive)
+  (vibemacs-worktrees--ensure-vterm)
+  ;; Get available assistants from customization
+  (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+         (agent (completing-read "Select agent: " assistants nil t))
+         (command (vibemacs-worktrees--assistant-command agent))
+         ;; Generate unique buffer name
+         (base-name (format "*vibemacs Agent %s*" agent))
+         (buffer-name (generate-new-buffer-name base-name))
+         (default-directory (or default-directory "~")))
+    (when (or (null command) (string-empty-p command))
+      (user-error "No command configured for agent: %s" agent))
+    ;; Create the vterm buffer
+    (let ((vterm-buffer-name buffer-name)
+          (display-buffer-overriding-action '(display-buffer-same-window)))
+      (vterm)
+      (let ((buffer (get-buffer buffer-name)))
+        (when buffer
+          (with-current-buffer buffer
+            (setq-local header-line-format nil)
+            (setq-local vibemacs-worktrees--chat-program command)
+            (setq-local vibemacs-worktrees--chat-assistant agent)
+            (setq-local vibemacs-worktrees--chat-command-started nil)
+            ;; Launch the agent command
+            (when-let ((proc (get-buffer-process buffer)))
+              (vterm-send-string command)
+              (vterm-send-return)
+              (setq-local vibemacs-worktrees--chat-command-started t))))))
+    (message "Launched %s in new tab" agent)))
+
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."
   (interactive)
