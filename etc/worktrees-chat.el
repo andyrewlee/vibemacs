@@ -126,13 +126,19 @@ Prompts for agent selection and launches it in a new vterm buffer."
               (vterm-send-string command)
               (vterm-send-return)
               (setq-local vibemacs-worktrees--chat-command-started t)))))
-      ;; Now display the buffer in a new tab
+      ;; Now display the buffer in the center window
       (when buffer
-        (switch-to-buffer buffer)
-        ;; Configure tab-line to only show file and agent buffers
-        (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
-        ;; Enable tab-line-mode so it shows as a tab
-        (tab-line-mode 1))
+        (if (window-live-p vibemacs-worktrees--center-window)
+            (with-selected-window vibemacs-worktrees--center-window
+              (switch-to-buffer buffer)
+              ;; Configure tab-line to only show file and agent buffers
+              (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+              ;; Enable tab-line-mode so it shows as a tab
+              (tab-line-mode 1))
+          ;; Fallback if center window doesn't exist
+          (switch-to-buffer buffer)
+          (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+          (tab-line-mode 1)))
       (message "Launched %s in new tab" agent))))
 
 (defun vibemacs-worktrees--agent-tab-line-tabs ()
