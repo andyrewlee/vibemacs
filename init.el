@@ -60,11 +60,10 @@ Returns non-nil on success, nil on failure."
       inhibit-startup-screen t
       require-final-newline t
       use-short-answers t)
-;; Enable tab-bar mode for file tabs
-(tab-bar-mode 1)
-(setq tab-bar-new-tab-choice t  ;; New tabs show buffer menu
-      tab-bar-close-button-show nil  ;; Hide close buttons for cleaner look
-      tab-bar-new-button-show nil)   ;; Hide new tab button
+;; Enable tab-line mode for window-level file tabs
+(global-tab-line-mode 1)
+(setq tab-line-close-button-show nil  ;; Hide close buttons for cleaner look
+      tab-line-new-button-show nil)   ;; Hide new tab button
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
 (add-hook 'before-save-hook 'delete-trailing-whitespace)
@@ -152,11 +151,9 @@ Returns non-nil on success, nil on failure."
     "wh"   '(windmove-left                       :which-key "move to left window")
     "wj"   '(windmove-down                       :which-key "move to bottom window")
     ;; tabs
-    "tn"   '(tab-bar-switch-to-next-tab          :which-key "next tab")
-    "tp"   '(tab-bar-switch-to-prev-tab          :which-key "previous tab")
-    "tc"   '(tab-bar-close-tab                   :which-key "close tab")
-    "tN"   '(tab-bar-new-tab                     :which-key "new tab")
-    "tr"   '(tab-bar-rename-tab                  :which-key "rename tab")
+    "tn"   '(tab-line-switch-to-next-tab         :which-key "next tab")
+    "tp"   '(tab-line-switch-to-prev-tab         :which-key "previous tab")
+    "tc"   '(kill-buffer                         :which-key "close buffer")
     ;; buffer
     "be"   '(eval-buffer                         :which-key "eval buffer")
     "bn"   '(next-buffer                         :which-key "next buffer")

@@ -450,15 +450,14 @@ HELP overrides the default hover tooltip."
     buffer))
 
 (defun vibemacs-worktrees-git-status-open-file ()
-  "Open the file at point in a new tab in the center window."
+  "Open the file at point in the center window (shows as tab with tab-line-mode)."
   (interactive)
   (when-let* ((entry (vibemacs-worktrees-center--current-entry))
               (root (vibemacs-worktrees--entry-root entry))
               (file (get-text-property (point) 'vibemacs-file-path)))
     (when (and file (window-live-p vibemacs-worktrees--center-window))
       (with-selected-window vibemacs-worktrees--center-window
-        ;; Create a new tab and open the file in it
-        (tab-bar-new-tab)
+        ;; Open file - tab-line-mode will automatically show it as a tab
         (find-file (expand-file-name file root))))))
 
 (defun vibemacs-worktrees-git-status-refresh ()
@@ -484,21 +483,25 @@ HELP overrides the default hover tooltip."
         (if status-list
             (dolist (status status-list)
               (pcase-let ((`(,code . ,path) status))
-                (let ((status-face (cond
-                                    ((string-match-p "^M" code) 'font-lock-warning-face)
-                                    ((string-match-p "^A" code) 'success)
-                                    ((string-match-p "^D" code) 'error)
-                                    ((string-match-p "^\\?\\?" code) 'font-lock-comment-face)
-                                    (t 'default))))
+                (let* ((status-face (cond
+                                     ((string-match-p "^M" code) 'font-lock-warning-face)
+                                     ((string-match-p "^A" code) 'success)
+                                     ((string-match-p "^D" code) 'error)
+                                     ((string-match-p "^\\?\\?" code) 'font-lock-comment-face)
+                                     (t 'default)))
+                       (line-start (point)))
+                  (require 'button)
+                  ;; Insert status code with face
                   (insert (propertize (format "%-3s" (if (> (length code) 0) code "??"))
                                       'face status-face))
-                  (require 'button)
+                  ;; Insert filename with face
                   (insert (propertize path
                                       'face 'default
-                                      'vibemacs-file-path path
                                       'mouse-face 'highlight
                                       'help-echo "RET to open file"))
-                  (insert "\n"))))
+                  (insert "\n")
+                  ;; Add vibemacs-file-path property to entire line
+                  (put-text-property line-start (1- (point)) 'vibemacs-file-path path))))
           (insert (propertize "Working tree clean\n" 'face 'success)))
         (goto-char (point-min))
         (forward-line 3)))
