@@ -151,6 +151,12 @@ Only shows file buffers, agent buffers, and worktree chat buffers that belong to
       (setq tab-order (append tab-order (list current-buf)))
       (set-window-parameter window 'vibemacs-tab-order tab-order))
 
+    ;; Clean up dead buffers from tab-order and persist
+    (let ((cleaned-order (seq-filter #'buffer-live-p tab-order)))
+      (unless (equal cleaned-order tab-order)
+        (setq tab-order cleaned-order)
+        (set-window-parameter window 'vibemacs-tab-order tab-order)))
+
     ;; Filter to only show buffers from the current worktree, preserving order
     (seq-filter (lambda (buf)
                   (and (buffer-live-p buf)
@@ -158,15 +164,18 @@ Only shows file buffers, agent buffers, and worktree chat buffers that belong to
                          (cond
                           ;; File buffers: check if file is in current worktree directory
                           ((buffer-file-name)
-                           (and current-root
-                                (string-prefix-p current-root (buffer-file-name))))
+                           (or (not current-root)  ; If no current root, show all files
+                               (let ((file-path (expand-file-name (buffer-file-name)))
+                                     (root-path (file-name-as-directory (expand-file-name current-root))))
+                                 (string-prefix-p root-path file-path))))
                           ;; Agent/chat buffers: check if they belong to current worktree
                           ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
                                (string-match-p "\\*vibemacs Chat" (buffer-name)))
-                           (and (boundp 'vibemacs-worktrees--buffer-root)
-                                vibemacs-worktrees--buffer-root
-                                current-root
-                                (string= vibemacs-worktrees--buffer-root current-root)))
+                           (or (not current-root)  ; If no current root, show all agent/chat buffers
+                               (and (boundp 'vibemacs-worktrees--buffer-root)
+                                    vibemacs-worktrees--buffer-root
+                                    (string= (expand-file-name vibemacs-worktrees--buffer-root)
+                                            (expand-file-name current-root)))))
                           ;; Don't show other buffers
                           (t nil)))))
                 tab-order)))
