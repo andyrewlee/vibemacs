@@ -60,24 +60,24 @@ Placeholders in the template should be in the form {placeholder}."
         (setq result (replace-regexp-in-string (regexp-quote placeholder) value result t t))))
     result))
 
-(defun vibemacs-worktrees--collapse-prompt (prompt)
-  "Collapse a multi-line PROMPT into a single line for vterm.
-Removes markdown headers, newlines, and excess whitespace."
+(defun vibemacs-worktrees--format-prompt (prompt)
+  "Format PROMPT for sending to vterm, removing markdown headers."
   (let* ((lines (split-string prompt "\n"))
-         ;; Filter out markdown headers and empty lines
+         ;; Filter out markdown headers but keep other lines
          (content-lines (seq-filter
                          (lambda (line)
                            (let ((trimmed (string-trim line)))
-                             (and (not (string-empty-p trimmed))
-                                  (not (string-prefix-p "#" trimmed)))))
-                         lines))
-         ;; Join lines with space
-         (joined (string-join content-lines " "))
-         ;; Collapse multiple spaces
-         (normalized (replace-regexp-in-string "[ \t]+" " " joined))
-         ;; Final trim
-         (result (string-trim normalized)))
-    result))
+                             (not (string-prefix-p "#" trimmed))))
+                         lines)))
+    ;; Join with newlines preserved
+    (string-join content-lines "\n")))
+
+(defun vibemacs-worktrees--send-multiline-to-vterm (text)
+  "Send multi-line TEXT to vterm using bracketed paste mode.
+This allows newlines to be preserved without executing the command."
+  ;; Enable bracketed paste mode, send text, disable bracketed paste
+  (process-send-string (get-buffer-process (current-buffer))
+                       (concat "\e[200~" text "\e[201~")))
 
 ;;; Chat Buffer Management
 
@@ -321,11 +321,11 @@ to the current buffer."
            (raw-prompt (if template
                            (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
                          ;; Fallback if template file is not found
-                         (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task)))
-           ;; Collapse to single line for vterm
-           (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
+                         (format "Research the codebase to identify all files, modules, services, and features related to the task:\n\n%s" task)))
+           ;; Format prompt (remove headers but keep newlines)
+           (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
+      ;; Send the multi-line prompt to vterm using bracketed paste
+      (vibemacs-worktrees--send-multiline-to-vterm prompt)
       (vterm-send-return)
       (message "Sent research request for task"))))
 
@@ -350,11 +350,11 @@ prompt to the current buffer."
                             `(("file_name" . ,file-name)
                               ("task" . ,task)))
                          ;; Fallback if template file is not found
-                         (format "Create a phased plan file at plans/%s.md for: %s" file-name task)))
-           ;; Collapse to single line for vterm
-           (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
+                         (format "Create a phased plan file at plans/%s.md for:\n\n%s" file-name task)))
+           ;; Format prompt (remove headers but keep newlines)
+           (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
+      ;; Send the multi-line prompt to vterm using bracketed paste
+      (vibemacs-worktrees--send-multiline-to-vterm prompt)
       (vterm-send-return)
       (message "Sent plan creation request for plans/%s.md" file-name))))
 
