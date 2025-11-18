@@ -249,6 +249,71 @@ Order is persisted per worktree so it survives buffer switches and reflows."
     (user-error "Chat escape is only available in vterm buffers"))
   (vterm-send-escape))
 
+(defun vibemacs-worktrees-research-codebase ()
+  "Research the codebase for a given task using the AI agent.
+Prompts for a task description and sends a research-focused prompt
+to the current buffer."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command must be run from a chat or agent buffer"))
+  (let ((task (read-string "Task to research: ")))
+    (when (string-empty-p task)
+      (user-error "Task description cannot be empty"))
+    ;; Build the research prompt
+    (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
+
+Your research should include:
+
+Relevant files, components, models, schemas, utilities, and configuration.
+Existing implementations or patterns connected to the requested feature.
+Any APIs, endpoints, environment variables, or integration points.
+Tests, stories, or documentation that relate to the task.
+Architectural patterns or constraints relevant to the solution.
+
+Deliverable:
+Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
+
+Task to research: %s" task)))
+      ;; Send the prompt to current vterm buffer
+      (vterm-send-string prompt)
+      (vterm-send-return)
+      (message "Sent research request for task"))))
+
+(defun vibemacs-worktrees-create-plan ()
+  "Create a phased plan file using the AI agent.
+Prompts for a file name and task description, then sends a formatted
+prompt to the current buffer."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command must be run from a chat or agent buffer"))
+  (let ((file-name (read-string "Plan file name (e.g., editor-refactor): "))
+        (task (read-string "Task description: ")))
+    (when (string-empty-p file-name)
+      (user-error "File name cannot be empty"))
+    (when (string-empty-p task)
+      (user-error "Task description cannot be empty"))
+    ;; Build the prompt
+    (let ((prompt (format "Using any research already completed (if any), create a Markdown file at plans/%s.md containing a phased, sectioned checklist.
+
+Each Phase must be ordered in a logical sequence from first to last.
+
+For each Phase, include:
+
+Objective — a concise explanation of what the phase accomplishes.
+Additional Context — helpful notes, background information, examples, or code samples.
+Checklist Items — detailed, actionable steps.
+Each item must start with - [ ] to allow progress tracking.
+User Stories (Gherkin Format) — acceptance criteria testable at the end of the phase.
+All stories in a phase should pass when that phase's checklist is complete.
+
+If no research was done, infer likely areas of the codebase and make reasonable assumptions.
+
+Task to plan for: %s" file-name task)))
+      ;; Send the prompt to current vterm buffer
+      (vterm-send-string prompt)
+      (vterm-send-return)
+      (message "Sent plan creation request for plans/%s.md" file-name))))
+
 ;; Set up keybindings
 (with-eval-after-load 'vterm
   (define-key vterm-mode-map (kbd "C-c C-c") #'vibemacs-worktrees-chat-send-interrupt))
