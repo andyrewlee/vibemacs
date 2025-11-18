@@ -305,7 +305,8 @@ to the current buffer."
   (interactive)
   (unless (derived-mode-p 'vterm-mode)
     (user-error "This command must be run from a chat or agent buffer"))
-  (let ((task (read-string "Task to research: ")))
+  (let ((vterm-buffer (current-buffer))
+        (task (read-string "Task to research: ")))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
     ;; Load and build the research prompt from template
@@ -317,8 +318,9 @@ to the current buffer."
            ;; Format prompt (remove headers but keep newlines)
            (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
       ;; Send the multi-line prompt to vterm using bracketed paste
-      (vibemacs-worktrees--send-multiline-to-vterm prompt)
-      (vterm-send-return)
+      (with-current-buffer vterm-buffer
+        (vibemacs-worktrees--send-multiline-to-vterm prompt)
+        (vterm-send-return))
       (message "Sent research request for task"))))
 
 (defun vibemacs-worktrees-create-plan ()
@@ -328,7 +330,8 @@ prompt to the current buffer."
   (interactive)
   (unless (derived-mode-p 'vterm-mode)
     (user-error "This command must be run from a chat or agent buffer"))
-  (let ((file-name (read-string "Plan file name (e.g., editor-refactor): "))
+  (let ((vterm-buffer (current-buffer))
+        (file-name (read-string "Plan file name (e.g., editor-refactor): "))
         (task (read-string "Task description: ")))
     (when (string-empty-p file-name)
       (user-error "File name cannot be empty"))
@@ -346,8 +349,9 @@ prompt to the current buffer."
            ;; Format prompt (remove headers but keep newlines)
            (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
       ;; Send the multi-line prompt to vterm using bracketed paste
-      (vibemacs-worktrees--send-multiline-to-vterm prompt)
-      (vterm-send-return)
+      (with-current-buffer vterm-buffer
+        (vibemacs-worktrees--send-multiline-to-vterm prompt)
+        (vterm-send-return))
       (message "Sent plan creation request for plans/%s.md" file-name))))
 
 ;; Set up keybindings
