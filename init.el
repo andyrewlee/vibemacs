@@ -151,6 +151,7 @@ Falls back to default evil-quit for special buffers."
     "van"  '(vibemacs-worktrees-new-agent-tab     :which-key "new agent tab")
     "var"  '(vibemacs-worktrees-research-codebase :which-key "research codebase")
     "vap"  '(vibemacs-worktrees-create-plan       :which-key "create AI plan")
+    "vtk"  '(vibemacs-worktrees-terminal-kill-server :which-key "kill terminal server")
     "vn"   '(tab-line-switch-to-next-tab          :which-key "next tab")
     "vp"   '(tab-line-switch-to-prev-tab          :which-key "previous tab")
     "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
