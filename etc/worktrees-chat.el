@@ -319,17 +319,11 @@ to the current buffer."
     ;; Load and build the research prompt from template
     (let* ((template (vibemacs-worktrees--load-prompt-template "research.md"))
            (raw-prompt (if template
-                           (progn
-                             (message "DEBUG: Loaded template, length: %d" (length template))
-                             (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task))))
+                           (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
                          ;; Fallback if template file is not found
-                         (progn
-                           (message "DEBUG: Template NOT found, using fallback")
-                           (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task))))
+                         (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task)))
            ;; Collapse to single line for vterm
            (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
-      ;; Debug: show what we're actually sending
-      (message "DEBUG: Collapsed prompt (length %d): %S" (length prompt) (substring prompt 0 (min 100 (length prompt))))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
