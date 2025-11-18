@@ -101,12 +101,16 @@ When ENTRY is nil, reuse the currently active worktree."
       (setq vibemacs-worktrees--center-window window)
 
       ;; Save current buffer name when switching away from previous worktree
+      ;; Only save if it's a chat/agent buffer, not a file buffer
       (when (and switching-worktrees previous-entry)
         (with-selected-window window
           (when (buffer-live-p (current-buffer))
-            (vibemacs-worktrees--save-last-active-buffer
-             previous-entry
-             (buffer-name (current-buffer))))))
+            (let ((buf-name (buffer-name (current-buffer))))
+              (when (or (string-match-p "\\*vibemacs Agent" buf-name)
+                       (string-match-p "\\*vibemacs Chat" buf-name))
+                (vibemacs-worktrees--save-last-active-buffer
+                 previous-entry
+                 buf-name))))))
 
       ;; Reset tab order when switching to a different worktree
       (when switching-worktrees
@@ -116,12 +120,16 @@ When ENTRY is nil, reuse the currently active worktree."
       (set-window-parameter window 'vibemacs-center-active 'chat)
 
       (with-selected-window window
-        ;; Try to restore last active buffer, fall back to chat or prompt for agent
+        ;; Try to restore last active chat/agent buffer or prompt for agent
         (let* ((last-buffer-name (vibemacs-worktrees--get-last-active-buffer-name entry))
                (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
+               ;; Only restore if it's still a chat/agent buffer
+               (last-buffer-valid (and (buffer-live-p last-buffer)
+                                      (or (string-match-p "\\*vibemacs Agent" last-buffer-name)
+                                          (string-match-p "\\*vibemacs Chat" last-buffer-name))))
                (buffer (cond
-                        ;; First priority: restore saved buffer if it exists
-                        ((buffer-live-p last-buffer)
+                        ;; First priority: restore saved chat/agent buffer if valid
+                        (last-buffer-valid
                          last-buffer)
                         ;; Second priority: use any existing chat/agent tab
                         ((vibemacs-worktrees--has-any-chat-tabs entry))
