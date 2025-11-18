@@ -27,19 +27,24 @@
 (defun vibemacs-worktrees--load-prompt-template (filename)
   "Load a prompt template from FILENAME in the prompts directory.
 Returns the contents as a string, or nil if the file cannot be read."
-  ;; Find the main repository directory (not worktree)
-  (let* ((git-dir (ignore-errors
-                    (string-trim
-                     (shell-command-to-string "git rev-parse --git-common-dir"))))
-         (repo-root (when (and git-dir (not (string-empty-p git-dir)))
+  (let* (;; Try to find prompts in ~/.emacs.d/prompts first
+         (emacs-prompts (expand-file-name filename (expand-file-name "prompts" user-emacs-directory)))
+         ;; Fall back to finding via git
+         (git-dir (ignore-errors
+                    (let ((dir (string-trim (shell-command-to-string "git rev-parse --git-common-dir"))))
+                      (if (file-name-absolute-p dir)
+                          dir
+                        (expand-file-name dir default-directory)))))
+         (repo-root (when (and git-dir (file-directory-p git-dir))
                       (file-name-directory (directory-file-name git-dir))))
-         (prompts-dir (if repo-root
-                          (expand-file-name "prompts" repo-root)
-                        (expand-file-name "prompts"
-                                         (or (locate-dominating-file default-directory ".git")
-                                             default-directory))))
-         (prompt-file (expand-file-name filename prompts-dir)))
-    (when (file-exists-p prompt-file)
+         (git-prompts (when repo-root
+                        (expand-file-name filename (expand-file-name "prompts" repo-root))))
+         ;; Choose the first one that exists
+         (prompt-file (cond
+                       ((and emacs-prompts (file-exists-p emacs-prompts)) emacs-prompts)
+                       ((and git-prompts (file-exists-p git-prompts)) git-prompts)
+                       (t nil))))
+    (when (and prompt-file (file-exists-p prompt-file))
       (with-temp-buffer
         (insert-file-contents prompt-file)
         (buffer-string)))))
@@ -306,13 +311,17 @@ to the current buffer."
     ;; Load and build the research prompt from template
     (let* ((template (vibemacs-worktrees--load-prompt-template "research.md"))
            (raw-prompt (if template
-                           (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
+                           (progn
+                             (message "DEBUG: Loaded template, length: %d" (length template))
+                             (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task))))
                          ;; Fallback if template file is not found
-                         (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task)))
+                         (progn
+                           (message "DEBUG: Template NOT found, using fallback")
+                           (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task))))
            ;; Collapse to single line for vterm
            (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
       ;; Debug: show what we're actually sending
-      (message "DEBUG: Sending prompt (length %d): %S" (length prompt) prompt)
+      (message "DEBUG: Collapsed prompt (length %d): %S" (length prompt) (substring prompt 0 (min 100 (length prompt))))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
