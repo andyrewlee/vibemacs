@@ -19,8 +19,11 @@
 (declare-function vibemacs-worktrees-git-status--populate "worktrees-dashboard")
 (declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-dashboard")
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
+(declare-function vibemacs-worktrees--has-any-chat-tabs "worktrees-chat")
+(declare-function vibemacs-worktrees--create-agent-tab "worktrees-chat")
 (declare-function vterm "vterm")
 (defvar vterm-buffer-name)
+(defvar vibemacs-worktrees-chat-assistants)
 (declare-function tabulated-list-goto-id "tabulated-list")
 (declare-function hl-line-highlight "hl-line")
 
@@ -113,12 +116,20 @@ When ENTRY is nil, reuse the currently active worktree."
       (set-window-parameter window 'vibemacs-center-active 'chat)
 
       (with-selected-window window
-        ;; Try to restore last active buffer, fall back to chat
+        ;; Try to restore last active buffer, fall back to chat or prompt for agent
         (let* ((last-buffer-name (vibemacs-worktrees--get-last-active-buffer-name entry))
                (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
-               (buffer (if (buffer-live-p last-buffer)
-                          last-buffer
-                        (vibemacs-worktrees--chat-buffer entry))))
+               (buffer (cond
+                        ;; First priority: restore saved buffer if it exists
+                        ((buffer-live-p last-buffer)
+                         last-buffer)
+                        ;; Second priority: use any existing chat/agent tab
+                        ((vibemacs-worktrees--has-any-chat-tabs entry))
+                        ;; Third priority: prompt for agent selection
+                        (t
+                         (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+                                (agent (completing-read "Select agent: " assistants nil t)))
+                           (vibemacs-worktrees--create-agent-tab entry agent nil))))))
           (when buffer
             ;; Use switch-to-buffer to preserve window buffer history for tab-line
             (switch-to-buffer buffer nil t)
