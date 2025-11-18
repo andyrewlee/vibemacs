@@ -15,6 +15,7 @@
 (require 'worktrees-codex)
 (require 'worktrees-chat)
 (require 'worktrees-dashboard)
+(require 'worktrees-git-status)
 (require 'worktrees-layout)
 
 (provide 'worktrees)
