@@ -269,7 +269,19 @@ sectioned checklist."
       (unless chat-buffer
         (user-error "Failed to create chat buffer"))
       ;; Build the prompt
-      (let ((prompt (format "Create a Markdown file at `plans/%s.md` containing a **phased, sectioned checklist**.
+      (let ((prompt (format "Before creating the plan, **research the entire codebase** to identify all files, modules, services, and features that may be relevant to the task.
+Your research should include (but not be limited to):
+
+- Locating any existing implementations related to the requested feature.
+- Identifying utilities, components, or helper functions that could be leveraged.
+- Finding related tests, stories, configuration files, schemas, or API endpoints.
+- Mapping out any architectural constraints or patterns used in the codebase.
+
+Summarize your findings briefly, then proceed with generating the plan.
+
+---
+
+After the research summary, create a Markdown file at `plans/%s.md` containing a **phased, sectioned checklist**.
 Each section represents a **Phase**, and phases must be ordered in a logical top-to-bottom sequence.
 
 For **each Phase**, include:
@@ -281,7 +293,7 @@ For **each Phase**, include:
 4. **User Stories (Gherkin Format)** — acceptance criteria that can be manually tested.
    - All user stories in a phase should pass once all checklist items for that phase are complete.
 
-After defining all phases, generate the plan based on the following task:
+At the end, generate the full plan based on the following task:
 
 **Task:** %s" file-name task)))
         ;; Switch to the chat buffer and send the prompt
