@@ -61,16 +61,8 @@ Placeholders in the template should be in the form {placeholder}."
     result))
 
 (defun vibemacs-worktrees--format-prompt (prompt)
-  "Format PROMPT for sending to vterm, removing markdown headers."
-  (let* ((lines (split-string prompt "\n"))
-         ;; Filter out markdown headers but keep other lines
-         (content-lines (seq-filter
-                         (lambda (line)
-                           (let ((trimmed (string-trim line)))
-                             (not (string-prefix-p "#" trimmed))))
-                         lines)))
-    ;; Join with newlines preserved
-    (string-join content-lines "\n")))
+  "Format PROMPT for sending to vterm, preserving all formatting."
+  prompt)
 
 (defun vibemacs-worktrees--send-multiline-to-vterm (text)
   "Send multi-line TEXT to vterm using bracketed paste mode.

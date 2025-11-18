@@ -1,4 +1,4 @@
-# Create Phased Plan Prompt
+# Planning guidelines
 
 Using any research already completed (if any), create a Markdown file at `plans/{file_name}.md` containing a phased, sectioned checklist.
 

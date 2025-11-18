@@ -1,4 +1,4 @@
-# Research Codebase Prompt
+# Research guidelines
 
 Research the codebase to identify all files, modules, services, and features related to the task.
 
