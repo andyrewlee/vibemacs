@@ -8,8 +8,6 @@
 
 (require 'worktrees-core)
 (require 'worktrees-codex)
-(require 'evil)
-(require 'magit)
 
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 (defvar vibemacs-worktrees--center-window)
