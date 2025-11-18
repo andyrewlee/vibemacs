@@ -148,7 +148,9 @@ Falls back to default evil-quit for special buffers."
     "ap"   '(multi-vterm-prev                     :which-key "prev codex term")
     "av"   '(vibemacs-vterm-toggle-copy-mode      :which-key "copy mode help")
     "ve"   '(vibemacs-worktrees-chat-send-escape  :which-key "send ESC to chat")
-    "vn"   '(vibemacs-worktrees-new-agent-tab     :which-key "new agent tab")
+    "van"  '(vibemacs-worktrees-new-agent-tab     :which-key "new agent tab")
+    "vn"   '(tab-line-switch-to-next-tab          :which-key "next tab")
+    "vp"   '(tab-line-switch-to-prev-tab          :which-key "previous tab")
     "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
     ;; git
     "g."   '(magit-dispatch                      :which-key "menu")
