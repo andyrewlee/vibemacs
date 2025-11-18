@@ -252,20 +252,15 @@ Order is persisted per worktree so it survives buffer switches and reflows."
 (defun vibemacs-worktrees-research-codebase ()
   "Research the codebase for a given task using the AI agent.
 Prompts for a task description and sends a research-focused prompt
-to identify relevant files, modules, and patterns."
+to the current buffer."
   (interactive)
-  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
-         (task (read-string "Task to research: ")))
-    (unless current-entry
-      (user-error "Select a worktree to research"))
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command must be run from a chat or agent buffer"))
+  (let ((task (read-string "Task to research: ")))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Get or create the chat buffer for this worktree
-    (let ((chat-buffer (vibemacs-worktrees--chat-buffer current-entry)))
-      (unless chat-buffer
-        (user-error "Failed to create chat buffer"))
-      ;; Build the research prompt
-      (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
+    ;; Build the research prompt
+    (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
 
 Your research should include:
 
@@ -279,38 +274,26 @@ Deliverable:
 Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
 
 Task to research: %s" task)))
-        ;; Switch to the chat buffer and send the prompt
-        (if (window-live-p vibemacs-worktrees--center-window)
-            (with-selected-window vibemacs-worktrees--center-window
-              (switch-to-buffer chat-buffer))
-          (switch-to-buffer chat-buffer))
-        ;; Send the prompt to vterm
-        (with-current-buffer chat-buffer
-          (vterm-send-string prompt)
-          (vterm-send-return))
-        (message "Sent research request for task")))))
+      ;; Send the prompt to current vterm buffer
+      (vterm-send-string prompt)
+      (vterm-send-return)
+      (message "Sent research request for task"))))
 
 (defun vibemacs-worktrees-create-plan ()
   "Create a phased plan file using the AI agent.
 Prompts for a file name and task description, then sends a formatted
-prompt to the AI agent to create a plans/$file_name.md with a
-sectioned checklist."
+prompt to the current buffer."
   (interactive)
-  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
-         (file-name (read-string "Plan file name (e.g., editor-refactor): "))
-         (task (read-string "Task description: ")))
-    (unless current-entry
-      (user-error "Select a worktree to create a plan"))
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command must be run from a chat or agent buffer"))
+  (let ((file-name (read-string "Plan file name (e.g., editor-refactor): "))
+        (task (read-string "Task description: ")))
     (when (string-empty-p file-name)
       (user-error "File name cannot be empty"))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Get or create the chat buffer for this worktree
-    (let ((chat-buffer (vibemacs-worktrees--chat-buffer current-entry)))
-      (unless chat-buffer
-        (user-error "Failed to create chat buffer"))
-      ;; Build the prompt
-      (let ((prompt (format "Using any research already completed (if any), create a Markdown file at plans/%s.md containing a phased, sectioned checklist.
+    ;; Build the prompt
+    (let ((prompt (format "Using any research already completed (if any), create a Markdown file at plans/%s.md containing a phased, sectioned checklist.
 
 Each Phase must be ordered in a logical sequence from first to last.
 
@@ -326,16 +309,10 @@ All stories in a phase should pass when that phase's checklist is complete.
 If no research was done, infer likely areas of the codebase and make reasonable assumptions.
 
 Task to plan for: %s" file-name task)))
-        ;; Switch to the chat buffer and send the prompt
-        (if (window-live-p vibemacs-worktrees--center-window)
-            (with-selected-window vibemacs-worktrees--center-window
-              (switch-to-buffer chat-buffer))
-          (switch-to-buffer chat-buffer))
-        ;; Send the prompt to vterm
-        (with-current-buffer chat-buffer
-          (vterm-send-string prompt)
-          (vterm-send-return))
-        (message "Sent plan creation request for plans/%s.md" file-name)))))
+      ;; Send the prompt to current vterm buffer
+      (vterm-send-string prompt)
+      (vterm-send-return)
+      (message "Sent plan creation request for plans/%s.md" file-name)))))
 
 ;; Set up keybindings
 (with-eval-after-load 'vterm
