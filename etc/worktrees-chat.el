@@ -47,6 +47,23 @@ Placeholders in the template should be in the form {placeholder}."
         (setq result (replace-regexp-in-string (regexp-quote placeholder) value result t t))))
     result))
 
+(defun vibemacs-worktrees--collapse-prompt (prompt)
+  "Collapse a multi-line PROMPT into a single line for vterm.
+Preserves paragraph structure by using double spaces between sections."
+  (let* ((lines (split-string prompt "\n" t))
+         ;; Filter out markdown headers and trim whitespace
+         (cleaned-lines (mapcar (lambda (line)
+                                   (let ((trimmed (string-trim line)))
+                                     ;; Skip markdown headers
+                                     (if (string-match "^#+" trimmed)
+                                         nil
+                                       trimmed)))
+                                 lines))
+         ;; Remove nil entries
+         (valid-lines (delq nil cleaned-lines)))
+    ;; Join with single space
+    (string-join valid-lines " ")))
+
 ;;; Chat Buffer Management
 
 (defun vibemacs-worktrees--chat-buffer (entry)
@@ -286,10 +303,12 @@ to the current buffer."
       (user-error "Task description cannot be empty"))
     ;; Load and build the research prompt from template
     (let* ((template (vibemacs-worktrees--load-prompt-template "research.md"))
-           (prompt (if template
-                       (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
-                     ;; Fallback if template file is not found
-                     (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task))))
+           (raw-prompt (if template
+                           (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
+                         ;; Fallback if template file is not found
+                         (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task)))
+           ;; Collapse to single line for vterm
+           (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
@@ -310,13 +329,15 @@ prompt to the current buffer."
       (user-error "Task description cannot be empty"))
     ;; Load and build the prompt from template
     (let* ((template (vibemacs-worktrees--load-prompt-template "plan.md"))
-           (prompt (if template
-                       (vibemacs-worktrees--substitute-prompt-vars
-                        template
-                        `(("file_name" . ,file-name)
-                          ("task" . ,task)))
-                     ;; Fallback if template file is not found
-                     (format "Create a phased plan file at plans/%s.md for: %s" file-name task))))
+           (raw-prompt (if template
+                           (vibemacs-worktrees--substitute-prompt-vars
+                            template
+                            `(("file_name" . ,file-name)
+                              ("task" . ,task)))
+                         ;; Fallback if template file is not found
+                         (format "Create a phased plan file at plans/%s.md for: %s" file-name task)))
+           ;; Collapse to single line for vterm
+           (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
