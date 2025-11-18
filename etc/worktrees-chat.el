@@ -22,6 +22,55 @@
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 
+;;; Prompt Loading
+
+(defun vibemacs-worktrees--load-prompt-template (filename)
+  "Load a prompt template from FILENAME in the prompts directory.
+Returns the contents as a string, or nil if the file cannot be read."
+  (let* (;; Try to find prompts in ~/.emacs.d/prompts first
+         (emacs-prompts (expand-file-name filename (expand-file-name "prompts" user-emacs-directory)))
+         ;; Fall back to finding via git
+         (git-dir (ignore-errors
+                    (let ((dir (string-trim (shell-command-to-string "git rev-parse --git-common-dir"))))
+                      (if (file-name-absolute-p dir)
+                          dir
+                        (expand-file-name dir default-directory)))))
+         (repo-root (when (and git-dir (file-directory-p git-dir))
+                      (file-name-directory (directory-file-name git-dir))))
+         (git-prompts (when repo-root
+                        (expand-file-name filename (expand-file-name "prompts" repo-root))))
+         ;; Choose the first one that exists
+         (prompt-file (cond
+                       ((and emacs-prompts (file-exists-p emacs-prompts)) emacs-prompts)
+                       ((and git-prompts (file-exists-p git-prompts)) git-prompts)
+                       (t nil))))
+    (when (and prompt-file (file-exists-p prompt-file))
+      (with-temp-buffer
+        (insert-file-contents prompt-file)
+        (buffer-string)))))
+
+(defun vibemacs-worktrees--substitute-prompt-vars (template vars)
+  "Substitute variables in TEMPLATE using VARS alist.
+VARS is an alist of (placeholder . value) pairs.
+Placeholders in the template should be in the form {placeholder}."
+  (let ((result template))
+    (dolist (pair vars)
+      (let ((placeholder (format "{%s}" (car pair)))
+            (value (cdr pair)))
+        (setq result (replace-regexp-in-string (regexp-quote placeholder) value result t t))))
+    result))
+
+(defun vibemacs-worktrees--format-prompt (prompt)
+  "Format PROMPT for sending to vterm, preserving all formatting."
+  prompt)
+
+(defun vibemacs-worktrees--send-multiline-to-vterm (text)
+  "Send multi-line TEXT to vterm using bracketed paste mode.
+This allows newlines to be preserved without executing the command."
+  ;; Enable bracketed paste mode, send text, disable bracketed paste
+  (process-send-string (get-buffer-process (current-buffer))
+                       (concat "\e[200~" text "\e[201~")))
+
 ;;; Chat Buffer Management
 
 (defun vibemacs-worktrees--chat-buffer (entry)
@@ -259,23 +308,16 @@ to the current buffer."
   (let ((task (read-string "Task to research: ")))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Build the research prompt
-    (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
-
-Your research should include:
-
-Relevant files, components, models, schemas, utilities, and configuration.
-Existing implementations or patterns connected to the requested feature.
-Any APIs, endpoints, environment variables, or integration points.
-Tests, stories, or documentation that relate to the task.
-Architectural patterns or constraints relevant to the solution.
-
-Deliverable:
-Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
-
-Task to research: %s" task)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
+    ;; Load and build the research prompt from template
+    (let* ((template (vibemacs-worktrees--load-prompt-template "research.md"))
+           (raw-prompt (if template
+                           (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
+                         ;; Fallback if template file is not found
+                         (format "Research the codebase to identify all files, modules, services, and features related to the task:\n\n%s" task)))
+           ;; Format prompt (remove headers but keep newlines)
+           (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
+      ;; Send the multi-line prompt to vterm using bracketed paste
+      (vibemacs-worktrees--send-multiline-to-vterm prompt)
       (vterm-send-return)
       (message "Sent research request for task"))))
 
@@ -292,25 +334,19 @@ prompt to the current buffer."
       (user-error "File name cannot be empty"))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Build the prompt
-    (let ((prompt (format "Using any research already completed (if any), create a Markdown file at plans/%s.md containing a phased, sectioned checklist.
-
-Each Phase must be ordered in a logical sequence from first to last.
-
-For each Phase, include:
-
-Objective — a concise explanation of what the phase accomplishes.
-Additional Context — helpful notes, background information, examples, or code samples.
-Checklist Items — detailed, actionable steps.
-Each item must start with - [ ] to allow progress tracking.
-User Stories (Gherkin Format) — acceptance criteria testable at the end of the phase.
-All stories in a phase should pass when that phase's checklist is complete.
-
-If no research was done, infer likely areas of the codebase and make reasonable assumptions.
-
-Task to plan for: %s" file-name task)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
+    ;; Load and build the prompt from template
+    (let* ((template (vibemacs-worktrees--load-prompt-template "plan.md"))
+           (raw-prompt (if template
+                           (vibemacs-worktrees--substitute-prompt-vars
+                            template
+                            `(("file_name" . ,file-name)
+                              ("task" . ,task)))
+                         ;; Fallback if template file is not found
+                         (format "Create a phased plan file at plans/%s.md for:\n\n%s" file-name task)))
+           ;; Format prompt (remove headers but keep newlines)
+           (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
+      ;; Send the multi-line prompt to vterm using bracketed paste
+      (vibemacs-worktrees--send-multiline-to-vterm prompt)
       (vterm-send-return)
       (message "Sent plan creation request for plans/%s.md" file-name))))
 
