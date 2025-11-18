@@ -143,14 +143,14 @@
 (defun vibemacs-worktrees--save-last-active-buffer (entry buffer-name)
   "Save BUFFER-NAME as the last active buffer for worktree ENTRY."
   (when entry
-    (let ((metadata (vibemacs-worktrees--ensure-metadata entry)))
+    (let ((metadata (vibemacs-worktrees--load-metadata entry)))
       (setf (alist-get 'last-active-buffer-name metadata) buffer-name)
       (vibemacs-worktrees--save-metadata entry metadata))))
 
 (defun vibemacs-worktrees--get-last-active-buffer-name (entry)
   "Get the last active buffer name for worktree ENTRY, or nil if none."
   (when entry
-    (let ((metadata (vibemacs-worktrees--ensure-metadata entry)))
+    (let ((metadata (vibemacs-worktrees--load-metadata entry)))
       (alist-get 'last-active-buffer-name metadata))))
 
 (provide 'worktrees-metadata)
