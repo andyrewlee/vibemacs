@@ -1,4 +1,14 @@
+;;; init.el --- vibemacs configuration entry point -*- lexical-binding: t; -*-
+
+;;; Commentary:
+;;; vibemacs: A vertical-integrated Emacs config for software engineers.
+;;; This file handles bootstrapping, basic defaults, UI polish, and loading
+;;; of the worktree management modules (in etc/worktrees-*.el).
+
+;;; Code:
+
 ;;; package manager
+;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
@@ -8,6 +18,8 @@
   (package-install 'use-package))
 (require 'use-package)
 (require 'project)
+
+;; Add local modules to load-path and launch worktrees
 (add-to-list 'load-path (expand-file-name "etc" user-emacs-directory))
 (condition-case err
     (progn
@@ -41,14 +53,17 @@ Returns non-nil on success, nil on failure."
                (message "Refreshing package archives…")
                (package-refresh-contents)))))))))
 
+;; Auto-install missing packages using the custom ensure function
 (setq use-package-ensure-function #'vibemacs-use-package-ensure
       use-package-always-ensure t)
 
 ;;; keep custom out of init.el
+;;; Redirect Customization UI settings to a separate file to keep init.el clean.
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (when (file-exists-p custom-file) (load custom-file))
 
 ;;; defaults
+;;; Minimalist UI and sensible defaults for editing.
 (when (fboundp 'menu-bar-mode)   (menu-bar-mode -1))
 (when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
 (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
@@ -72,6 +87,7 @@ Returns non-nil on success, nil on failure."
 (global-auto-revert-mode 1)
 
 ;;; vim
+;;; Evil mode configuration for Vim-like editing.
 (use-package evil
   :init
   (setq evil-want-C-u-scroll t
@@ -106,6 +122,7 @@ Falls back to default evil-quit for special buffers."
   :after evil)
 
 ;;; available keys after prefix is pressed
+;;; Which-key popups for discovering keybindings.
 (use-package which-key
   :init
   (setq which-key-separator " "
@@ -114,6 +131,7 @@ Falls back to default evil-quit for special buffers."
   (which-key-mode 1))
 
 ;;; keymaps with SPC as global leader
+;;; General.el for defining leader keys and keymaps.
 (use-package general
   :after evil
   :config
@@ -184,6 +202,7 @@ Falls back to default evil-quit for special buffers."
     "bm"   '(buffer-menu                         :which-key "list buffers")))
 
 ;;; typescript
+;;; Modern TypeScript setup with tree-sitter, eglot (LSP), and apheleia (formatting).
 ;; npm i -g typescript typescript-language-server
 ;; npm i -g prettier eslint_d
 ;; syntax
@@ -235,6 +254,7 @@ Falls back to default evil-quit for special buffers."
 (use-package consult)
 
 ;;; markdown
+;;; GitHub-flavored markdown with visual polish.
 (use-package markdown-mode
   :mode ("README\\.md\\'" . gfm-mode)
   :init
@@ -246,6 +266,7 @@ Falls back to default evil-quit for special buffers."
          (markdown-ts-mode . vibemacs-markdown-visual-fill)))
 
 ;;; git
+;;; Magit integration for git operations.
 (use-package magit
   :commands (magit-status magit-dispatch magit-diff magit-commit
              magit-log-buffer-file magit-log-all magit-branch-checkout
@@ -271,6 +292,7 @@ Falls back to default evil-quit for special buffers."
   (doom-themes-org-config))
 
 ;;; terminal
+;;; Vterm integration for terminal within Emacs.
 (use-package vterm
   :commands (vterm)
   :init
@@ -283,6 +305,7 @@ Falls back to default evil-quit for special buffers."
   (setq multi-vterm-buffer-name "codex"))
 
 ;;; prose polish
+;;; Aesthetics for writing prose (used in Markdown).
 (use-package visual-fill-column
   :commands (visual-fill-column-mode))
 

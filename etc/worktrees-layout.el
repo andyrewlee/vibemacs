@@ -15,9 +15,9 @@
 
 (declare-function vibemacs-worktrees-dashboard--setup-buffer "worktrees-dashboard")
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
-(declare-function vibemacs-worktrees-git-status--setup-buffer "worktrees-dashboard")
-(declare-function vibemacs-worktrees-git-status--populate "worktrees-dashboard")
-(declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-dashboard")
+(declare-function vibemacs-worktrees-git-status--setup-buffer "worktrees-git-status")
+(declare-function vibemacs-worktrees-git-status--populate "worktrees-git-status")
+(declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-git-status")
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vibemacs-worktrees--has-any-chat-tabs "worktrees-chat")
 (declare-function vibemacs-worktrees--create-agent-tab "worktrees-chat")
