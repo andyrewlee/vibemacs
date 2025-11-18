@@ -249,6 +249,47 @@ Order is persisted per worktree so it survives buffer switches and reflows."
     (user-error "Chat escape is only available in vterm buffers"))
   (vterm-send-escape))
 
+(defun vibemacs-worktrees-research-codebase ()
+  "Research the codebase for a given task using the AI agent.
+Prompts for a task description and sends a research-focused prompt
+to identify relevant files, modules, and patterns."
+  (interactive)
+  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
+         (task (read-string "Task to research: ")))
+    (unless current-entry
+      (user-error "Select a worktree to research"))
+    (when (string-empty-p task)
+      (user-error "Task description cannot be empty"))
+    ;; Get or create the chat buffer for this worktree
+    (let ((chat-buffer (vibemacs-worktrees--chat-buffer current-entry)))
+      (unless chat-buffer
+        (user-error "Failed to create chat buffer"))
+      ;; Build the research prompt
+      (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
+
+Your research should include:
+
+- Relevant files, components, models, schemas, utilities, and configuration.
+- Existing implementations or patterns connected to the requested feature.
+- Any APIs, endpoints, environment variables, or integration points.
+- Tests, stories, or documentation that relate to the task.
+- Architectural patterns or constraints relevant to the solution.
+
+**Deliverable:**
+Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
+
+**Task to research:** %s" task)))
+        ;; Switch to the chat buffer and send the prompt
+        (if (window-live-p vibemacs-worktrees--center-window)
+            (with-selected-window vibemacs-worktrees--center-window
+              (switch-to-buffer chat-buffer))
+          (switch-to-buffer chat-buffer))
+        ;; Send the prompt to vterm
+        (with-current-buffer chat-buffer
+          (vterm-send-string prompt)
+          (vterm-send-return))
+        (message "Sent research request for task")))))
+
 (defun vibemacs-worktrees-create-plan ()
   "Create a phased plan file using the AI agent.
 Prompts for a file name and task description, then sends a formatted
@@ -269,33 +310,22 @@ sectioned checklist."
       (unless chat-buffer
         (user-error "Failed to create chat buffer"))
       ;; Build the prompt
-      (let ((prompt (format "Before creating the plan, **research the entire codebase** to identify all files, modules, services, and features that may be relevant to the task.
-Your research should include (but not be limited to):
+      (let ((prompt (format "Using any research already completed (if any), create a Markdown file at `plans/%s.md` containing a **phased, sectioned checklist**.
 
-- Locating any existing implementations related to the requested feature.
-- Identifying utilities, components, or helper functions that could be leveraged.
-- Finding related tests, stories, configuration files, schemas, or API endpoints.
-- Mapping out any architectural constraints or patterns used in the codebase.
-
-Summarize your findings briefly, then proceed with generating the plan.
-
----
-
-After the research summary, create a Markdown file at `plans/%s.md` containing a **phased, sectioned checklist**.
-Each section represents a **Phase**, and phases must be ordered in a logical top-to-bottom sequence.
+Each Phase must be ordered in a logical sequence from first to last.
 
 For **each Phase**, include:
 
-1. **Objective** — a concise description of what this phase aims to achieve.
-2. **Additional Context** — any helpful background information, examples, or code samples.
+1. **Objective** — a concise explanation of what the phase accomplishes.
+2. **Additional Context** — helpful notes, background information, examples, or code samples.
 3. **Checklist Items** — detailed, actionable steps.
-   - Each item must start with `- [ ]` so progress can be tracked.
-4. **User Stories (Gherkin Format)** — acceptance criteria that can be manually tested.
-   - All user stories in a phase should pass once all checklist items for that phase are complete.
+   - Each item must start with `- [ ]` to allow progress tracking.
+4. **User Stories (Gherkin Format)** — acceptance criteria testable at the end of the phase.
+   - All stories in a phase should pass when that phase's checklist is complete.
 
-At the end, generate the full plan based on the following task:
+If no research was done, infer likely areas of the codebase and make reasonable assumptions.
 
-**Task:** %s" file-name task)))
+**Task to plan for:** %s" file-name task)))
         ;; Switch to the chat buffer and send the prompt
         (if (window-live-p vibemacs-worktrees--center-window)
             (with-selected-window vibemacs-worktrees--center-window
