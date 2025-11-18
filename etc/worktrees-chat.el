@@ -298,6 +298,14 @@ Order is persisted per worktree so it survives buffer switches and reflows."
     (user-error "Chat escape is only available in vterm buffers"))
   (vterm-send-escape))
 
+(defun vibemacs-worktrees-terminal-kill-server ()
+  "Send Ctrl+C to the terminal to kill the running server process."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command is only available in vterm terminal buffers"))
+  (vterm-send-key "c" nil nil t)
+  (message "Sent interrupt (Ctrl+C) to terminal"))
+
 (defun vibemacs-worktrees-research-codebase ()
   "Research the codebase for a given task using the AI agent.
 Prompts for a task description and sends a research-focused prompt
