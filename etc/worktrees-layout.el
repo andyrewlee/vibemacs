@@ -129,9 +129,11 @@ When ENTRY is nil, reuse the currently active worktree."
                                              (string-match-p "\\*vibemacs Chat" last-buffer-name))))
                  (buffer (if last-buffer-valid
                              last-buffer
-                           ;; Check if any chat/agent tabs exist, otherwise default to codex
+                           ;; Check if any chat/agent tabs exist, otherwise use configured assistant
                            (or (vibemacs-worktrees--has-any-chat-tabs entry)
-                               (vibemacs-worktrees--create-agent-tab entry "codex" nil)))))
+                               (let* ((metadata (vibemacs-worktrees--load-metadata entry))
+                                      (assistant (vibemacs-worktrees--metadata-assistant metadata)))
+                                 (vibemacs-worktrees--create-agent-tab entry assistant nil))))))
             (when buffer
               ;; Use switch-to-buffer to preserve window buffer history for tab-line
               (switch-to-buffer buffer nil t)
