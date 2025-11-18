@@ -57,19 +57,11 @@ Placeholders in the template should be in the form {placeholder}."
 
 (defun vibemacs-worktrees--collapse-prompt (prompt)
   "Collapse a multi-line PROMPT into a single line for vterm.
-Removes all newlines and markdown headers, joining text with spaces."
-  (let* ((lines (split-string prompt "\n"))
-         ;; Filter out empty lines and markdown headers
-         (non-header-lines (seq-filter
-                            (lambda (line)
-                              (let ((trimmed (string-trim line)))
-                                (and (not (string-empty-p trimmed))
-                                     (not (string-prefix-p "#" trimmed)))))
-                            lines))
-         ;; Join with space and trim each line first
-         (joined (mapconcat #'string-trim non-header-lines " "))
-         ;; Collapse multiple spaces/tabs
-         (normalized (replace-regexp-in-string "[ \t]+" " " joined))
+Removes ALL newlines, carriage returns, and excess whitespace."
+  (let* (;; Replace all newlines and carriage returns with spaces
+         (no-newlines (replace-regexp-in-string "[\n\r]" " " prompt))
+         ;; Collapse multiple spaces/tabs into single space
+         (normalized (replace-regexp-in-string "[ \t]+" " " no-newlines))
          ;; Final trim
          (result (string-trim normalized)))
     result))
@@ -319,6 +311,8 @@ to the current buffer."
                          (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task)))
            ;; Collapse to single line for vterm
            (prompt (vibemacs-worktrees--collapse-prompt raw-prompt)))
+      ;; Debug: show what we're actually sending
+      (message "DEBUG: Sending prompt (length %d): %S" (length prompt) prompt)
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
