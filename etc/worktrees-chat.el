@@ -249,6 +249,48 @@ Order is persisted per worktree so it survives buffer switches and reflows."
     (user-error "Chat escape is only available in vterm buffers"))
   (vterm-send-escape))
 
+(defun vibemacs-worktrees-create-plan ()
+  "Create a phased plan file using the AI agent.
+Prompts for a file name and task description, then sends a formatted
+prompt to the AI agent to create a plans/$file_name.md with a
+sectioned checklist."
+  (interactive)
+  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
+         (file-name (read-string "Plan file name (e.g., editor-refactor): "))
+         (task (read-string "Task description: ")))
+    (unless current-entry
+      (user-error "Select a worktree to create a plan"))
+    (when (string-empty-p file-name)
+      (user-error "File name cannot be empty"))
+    (when (string-empty-p task)
+      (user-error "Task description cannot be empty"))
+    ;; Get or create the chat buffer for this worktree
+    (let ((chat-buffer (vibemacs-worktrees--chat-buffer current-entry)))
+      (unless chat-buffer
+        (user-error "Failed to create chat buffer"))
+      ;; Build the prompt
+      (let ((prompt (format "Create a plans/%s.md that is a phased sectioned checklist with each section having checklist items. Each checklist items should start with [ ] so progress can be tracked.
+
+Each section is a Phase that can be committed and push. Make sure that the sections are ordered in a sequence that makes sense to do from top to bottom.
+
+Each section should have the following
+* Objective of the section
+* Additional context that will be helpful such as code samples
+* Checklist items
+* User stores in gherkin that can be manually tested at the end of the phase that should all pass when all the checklist items are done
+
+Here is the task to create the plan for: %s" file-name task)))
+        ;; Switch to the chat buffer and send the prompt
+        (if (window-live-p vibemacs-worktrees--center-window)
+            (with-selected-window vibemacs-worktrees--center-window
+              (switch-to-buffer chat-buffer))
+          (switch-to-buffer chat-buffer))
+        ;; Send the prompt to vterm
+        (with-current-buffer chat-buffer
+          (vterm-send-string prompt)
+          (vterm-send-return))
+        (message "Sent plan creation request for plans/%s.md" file-name)))))
+
 ;; Set up keybindings
 (with-eval-after-load 'vterm
   (define-key vterm-mode-map (kbd "C-c C-c") #'vibemacs-worktrees-chat-send-interrupt))
