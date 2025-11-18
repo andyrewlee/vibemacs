@@ -58,15 +58,21 @@ Placeholders in the template should be in the form {placeholder}."
 (defun vibemacs-worktrees--collapse-prompt (prompt)
   "Collapse a multi-line PROMPT into a single line for vterm.
 Removes all newlines and markdown headers, joining text with spaces."
-  ;; First, remove markdown headers (lines starting with #)
-  (let* ((without-headers (replace-regexp-in-string "^#.*$" "" prompt))
-         ;; Replace all newlines with spaces
-         (collapsed (replace-regexp-in-string "\n" " " without-headers))
-         ;; Collapse multiple spaces into single space
-         (normalized (replace-regexp-in-string " +" " " collapsed))
-         ;; Trim leading/trailing whitespace
-         (trimmed (string-trim normalized)))
-    trimmed))
+  (let* ((lines (split-string prompt "\n"))
+         ;; Filter out empty lines and markdown headers
+         (non-header-lines (seq-filter
+                            (lambda (line)
+                              (let ((trimmed (string-trim line)))
+                                (and (not (string-empty-p trimmed))
+                                     (not (string-prefix-p "#" trimmed)))))
+                            lines))
+         ;; Join with space and trim each line first
+         (joined (mapconcat #'string-trim non-header-lines " "))
+         ;; Collapse multiple spaces/tabs
+         (normalized (replace-regexp-in-string "[ \t]+" " " joined))
+         ;; Final trim
+         (result (string-trim normalized)))
+    result))
 
 ;;; Chat Buffer Management
 
