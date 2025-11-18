@@ -27,10 +27,18 @@
 (defun vibemacs-worktrees--load-prompt-template (filename)
   "Load a prompt template from FILENAME in the prompts directory.
 Returns the contents as a string, or nil if the file cannot be read."
-  (let ((prompt-file (expand-file-name filename
-                                       (expand-file-name "prompts"
-                                                        (or (locate-dominating-file default-directory ".git")
-                                                            default-directory)))))
+  ;; Find the main repository directory (not worktree)
+  (let* ((git-dir (ignore-errors
+                    (string-trim
+                     (shell-command-to-string "git rev-parse --git-common-dir"))))
+         (repo-root (when (and git-dir (not (string-empty-p git-dir)))
+                      (file-name-directory (directory-file-name git-dir))))
+         (prompts-dir (if repo-root
+                          (expand-file-name "prompts" repo-root)
+                        (expand-file-name "prompts"
+                                         (or (locate-dominating-file default-directory ".git")
+                                             default-directory))))
+         (prompt-file (expand-file-name filename prompts-dir)))
     (when (file-exists-p prompt-file)
       (with-temp-buffer
         (insert-file-contents prompt-file)
