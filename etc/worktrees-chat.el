@@ -269,17 +269,21 @@ sectioned checklist."
       (unless chat-buffer
         (user-error "Failed to create chat buffer"))
       ;; Build the prompt
-      (let ((prompt (format "Create a plans/%s.md that is a phased sectioned checklist with each section having checklist items. Each checklist items should start with [ ] so progress can be tracked.
+      (let ((prompt (format "Create a Markdown file at `plans/%s.md` containing a **phased, sectioned checklist**.
+Each section represents a **Phase**, and phases must be ordered in a logical top-to-bottom sequence.
 
-Each section is a Phase that can be committed and push. Make sure that the sections are ordered in a sequence that makes sense to do from top to bottom.
+For **each Phase**, include:
 
-Each section should have the following
-* Objective of the section
-* Additional context that will be helpful such as code samples
-* Checklist items
-* User stores in gherkin that can be manually tested at the end of the phase that should all pass when all the checklist items are done
+1. **Objective** — a concise description of what this phase aims to achieve.
+2. **Additional Context** — any helpful background information, examples, or code samples.
+3. **Checklist Items** — detailed, actionable steps.
+   - Each item must start with `- [ ]` so progress can be tracked.
+4. **User Stories (Gherkin Format)** — acceptance criteria that can be manually tested.
+   - All user stories in a phase should pass once all checklist items for that phase are complete.
 
-Here is the task to create the plan for: %s" file-name task)))
+After defining all phases, generate the plan based on the following task:
+
+**Task:** %s" file-name task)))
         ;; Switch to the chat buffer and send the prompt
         (if (window-live-p vibemacs-worktrees--center-window)
             (with-selected-window vibemacs-worktrees--center-window
