@@ -312,7 +312,7 @@ Task to plan for: %s" file-name task)))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
-      (message "Sent plan creation request for plans/%s.md" file-name)))))
+      (message "Sent plan creation request for plans/%s.md" file-name))))
 
 ;; Set up keybindings
 (with-eval-after-load 'vterm
