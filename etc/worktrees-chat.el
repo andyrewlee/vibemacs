@@ -22,6 +22,31 @@
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 
+;;; Prompt Loading
+
+(defun vibemacs-worktrees--load-prompt-template (filename)
+  "Load a prompt template from FILENAME in the prompts directory.
+Returns the contents as a string, or nil if the file cannot be read."
+  (let ((prompt-file (expand-file-name filename
+                                       (expand-file-name "prompts"
+                                                        (or (locate-dominating-file default-directory ".git")
+                                                            default-directory)))))
+    (when (file-exists-p prompt-file)
+      (with-temp-buffer
+        (insert-file-contents prompt-file)
+        (buffer-string)))))
+
+(defun vibemacs-worktrees--substitute-prompt-vars (template vars)
+  "Substitute variables in TEMPLATE using VARS alist.
+VARS is an alist of (placeholder . value) pairs.
+Placeholders in the template should be in the form {placeholder}."
+  (let ((result template))
+    (dolist (pair vars)
+      (let ((placeholder (format "{%s}" (car pair)))
+            (value (cdr pair)))
+        (setq result (replace-regexp-in-string (regexp-quote placeholder) value result t t))))
+    result))
+
 ;;; Chat Buffer Management
 
 (defun vibemacs-worktrees--chat-buffer (entry)
@@ -259,21 +284,12 @@ to the current buffer."
   (let ((task (read-string "Task to research: ")))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Build the research prompt
-    (let ((prompt (format "Research the codebase to identify all files, modules, services, and features related to the task.
-
-Your research should include:
-
-Relevant files, components, models, schemas, utilities, and configuration.
-Existing implementations or patterns connected to the requested feature.
-Any APIs, endpoints, environment variables, or integration points.
-Tests, stories, or documentation that relate to the task.
-Architectural patterns or constraints relevant to the solution.
-
-Deliverable:
-Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
-
-Task to research: %s" task)))
+    ;; Load and build the research prompt from template
+    (let* ((template (vibemacs-worktrees--load-prompt-template "research.md"))
+           (prompt (if template
+                       (vibemacs-worktrees--substitute-prompt-vars template `(("task" . ,task)))
+                     ;; Fallback if template file is not found
+                     (format "Research the codebase to identify all files, modules, services, and features related to the task: %s" task))))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
@@ -292,23 +308,15 @@ prompt to the current buffer."
       (user-error "File name cannot be empty"))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
-    ;; Build the prompt
-    (let ((prompt (format "Using any research already completed (if any), create a Markdown file at plans/%s.md containing a phased, sectioned checklist.
-
-Each Phase must be ordered in a logical sequence from first to last.
-
-For each Phase, include:
-
-Objective — a concise explanation of what the phase accomplishes.
-Additional Context — helpful notes, background information, examples, or code samples.
-Checklist Items — detailed, actionable steps.
-Each item must start with - [ ] to allow progress tracking.
-User Stories (Gherkin Format) — acceptance criteria testable at the end of the phase.
-All stories in a phase should pass when that phase's checklist is complete.
-
-If no research was done, infer likely areas of the codebase and make reasonable assumptions.
-
-Task to plan for: %s" file-name task)))
+    ;; Load and build the prompt from template
+    (let* ((template (vibemacs-worktrees--load-prompt-template "plan.md"))
+           (prompt (if template
+                       (vibemacs-worktrees--substitute-prompt-vars
+                        template
+                        `(("file_name" . ,file-name)
+                          ("task" . ,task)))
+                     ;; Fallback if template file is not found
+                     (format "Create a phased plan file at plans/%s.md for: %s" file-name task))))
       ;; Send the prompt to current vterm buffer
       (vterm-send-string prompt)
       (vterm-send-return)
