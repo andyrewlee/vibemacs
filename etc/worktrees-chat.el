@@ -89,16 +89,29 @@ ASSISTANT is the identifier configured for the chat session."
 
 ;;; Interactive Commands
 
-(defun vibemacs-worktrees-new-agent-tab ()
-  "Create a new tab with a selected AI agent (codex, claude, or gemini).
-Prompts for agent selection and launches it in a new vterm buffer."
-  (interactive)
+(defun vibemacs-worktrees--has-any-chat-tabs (entry)
+  "Check if ENTRY has any existing chat or agent tabs.
+Returns the first live chat/agent buffer found, or nil if none exist."
+  (when entry
+    (let ((root (vibemacs-worktrees--entry-root entry)))
+      (seq-find
+       (lambda (buf)
+         (and (buffer-live-p buf)
+              (with-current-buffer buf
+                (and (or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                        (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                     (boundp 'vibemacs-worktrees--buffer-root)
+                     vibemacs-worktrees--buffer-root
+                     (string= (expand-file-name vibemacs-worktrees--buffer-root)
+                             (expand-file-name root))))))
+       (buffer-list)))))
+
+(defun vibemacs-worktrees--create-agent-tab (entry agent &optional switch-to-buffer-p)
+  "Create a new agent tab for ENTRY using AGENT.
+If SWITCH-TO-BUFFER-P is non-nil, switch to the buffer in the center window.
+Returns the created buffer."
   (vibemacs-worktrees--ensure-vterm)
-  ;; Get the current worktree entry for scoping
-  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
-         (current-root (when current-entry (vibemacs-worktrees--entry-root current-entry)))
-         (assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
-         (agent (completing-read "Select agent: " assistants nil t))
+  (let* ((current-root (vibemacs-worktrees--entry-root entry))
          (command (vibemacs-worktrees--assistant-command agent))
          ;; Generate unique buffer name
          (base-name (format "*vibemacs Agent %s*" agent))
@@ -108,7 +121,6 @@ Prompts for agent selection and launches it in a new vterm buffer."
       (user-error "No command configured for agent: %s" agent))
     ;; Create the vterm buffer without switching to it first
     (let* ((vterm-buffer-name buffer-name)
-           (original-buffer (current-buffer))
            buffer)
       ;; Create vterm in background
       (save-window-excursion
@@ -127,20 +139,31 @@ Prompts for agent selection and launches it in a new vterm buffer."
               (vterm-send-string command)
               (vterm-send-return)
               (setq-local vibemacs-worktrees--chat-command-started t)))))
-      ;; Now display the buffer in the center window
+      ;; Always configure tab-line for the buffer
       (when buffer
-        (if (window-live-p vibemacs-worktrees--center-window)
-            (with-selected-window vibemacs-worktrees--center-window
-              (switch-to-buffer buffer)
-              ;; Configure tab-line to only show file and agent buffers
-              (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
-              ;; Enable tab-line-mode so it shows as a tab
-              (tab-line-mode 1))
-          ;; Fallback if center window doesn't exist
-          (switch-to-buffer buffer)
+        (with-current-buffer buffer
           (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
           (tab-line-mode 1)))
-      (message "Launched %s in new tab" agent))))
+      ;; Optionally display the buffer in the center window
+      (when (and buffer switch-to-buffer-p)
+        (if (window-live-p vibemacs-worktrees--center-window)
+            (with-selected-window vibemacs-worktrees--center-window
+              (switch-to-buffer buffer))
+          ;; Fallback if center window doesn't exist
+          (switch-to-buffer buffer)))
+      buffer)))
+
+(defun vibemacs-worktrees-new-agent-tab ()
+  "Create a new tab with a selected AI agent (codex, claude, or gemini).
+Prompts for agent selection and launches it in a new vterm buffer."
+  (interactive)
+  (let* ((current-entry (vibemacs-worktrees-center--current-entry))
+         (assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+         (agent (completing-read "Select agent: " assistants nil t)))
+    (when current-entry
+      (let ((buffer (vibemacs-worktrees--create-agent-tab current-entry agent t)))
+        (when buffer
+          (message "Launched %s in new tab" agent))))))
 
 (defun vibemacs-worktrees--agent-tab-line-tabs ()
   "Return list of buffers to show in tab-line for the center pane.

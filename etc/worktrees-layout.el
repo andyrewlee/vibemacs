@@ -19,8 +19,11 @@
 (declare-function vibemacs-worktrees-git-status--populate "worktrees-dashboard")
 (declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-dashboard")
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
+(declare-function vibemacs-worktrees--has-any-chat-tabs "worktrees-chat")
+(declare-function vibemacs-worktrees--create-agent-tab "worktrees-chat")
 (declare-function vterm "vterm")
 (defvar vterm-buffer-name)
+(defvar vibemacs-worktrees-chat-assistants)
 (declare-function tabulated-list-goto-id "tabulated-list")
 (declare-function hl-line-highlight "hl-line")
 
@@ -82,33 +85,60 @@ When ENTRY is nil, use the currently active worktree."
   "Activate the chat tab in the center pane for ENTRY.
 When ENTRY is nil, reuse the currently active worktree."
   (interactive)
-  (let* ((entry (or entry (vibemacs-worktrees-center--current-entry)))
-         (window (if (window-live-p vibemacs-worktrees--center-window)
-                     vibemacs-worktrees--center-window
-                   (selected-window)))
-         (previous-entry (when (window-live-p window)
-                          (window-parameter window 'vibemacs-center-entry))))
+  (let* ((entry (or entry (vibemacs-worktrees-center--current-entry))))
     (unless entry
       (user-error "Select a worktree to view chat"))
-    (if (not (window-live-p window))
-        (message "Center pane not initialised yet.")
-      (setq vibemacs-worktrees--center-window window)
-      ;; Reset tab order when switching to a different worktree
-      (when (and previous-entry
-                 (not (equal (vibemacs-worktrees--entry-root entry)
-                            (vibemacs-worktrees--entry-root previous-entry))))
-        (set-window-parameter window 'vibemacs-tab-order nil))
-      (set-window-parameter window 'vibemacs-center-entry entry)
-      (set-window-parameter window 'vibemacs-center-active 'chat)
-      (with-selected-window window
-        (let ((buffer (vibemacs-worktrees--chat-buffer entry)))
-          (when buffer
-            ;; Use switch-to-buffer to preserve window buffer history for tab-line
-            (switch-to-buffer buffer nil t)
-            (dolist (win (get-buffer-window-list buffer nil t))
-              (unless (eq win window)
-                (delete-window win))))))
-      (force-mode-line-update t))))
+    (let* ((window (if (window-live-p vibemacs-worktrees--center-window)
+                       vibemacs-worktrees--center-window
+                     (selected-window)))
+           (previous-entry (when (window-live-p window)
+                            (window-parameter window 'vibemacs-center-entry)))
+           (switching-worktrees (and previous-entry
+                                     (not (equal (vibemacs-worktrees--entry-root entry)
+                                                 (vibemacs-worktrees--entry-root previous-entry))))))
+      (if (not (window-live-p window))
+          (message "Center pane not initialised yet.")
+        (setq vibemacs-worktrees--center-window window)
+
+        ;; Save current buffer name when switching away from previous worktree
+        ;; Only save if it's a chat/agent buffer, not a file buffer
+        (when (and switching-worktrees previous-entry)
+          (with-selected-window window
+            (when (buffer-live-p (current-buffer))
+              (let ((buf-name (buffer-name (current-buffer))))
+                (when (or (string-match-p "\\*vibemacs Agent" buf-name)
+                          (string-match-p "\\*vibemacs Chat" buf-name))
+                  (vibemacs-worktrees--save-last-active-buffer
+                   previous-entry
+                   buf-name))))))
+
+        ;; Reset tab order when switching to a different worktree
+        (when switching-worktrees
+          (set-window-parameter window 'vibemacs-tab-order nil))
+
+        (set-window-parameter window 'vibemacs-center-entry entry)
+        (set-window-parameter window 'vibemacs-center-active 'chat)
+
+        (with-selected-window window
+          ;; Try to restore last active buffer, fall back to chat
+          (let* ((last-buffer-name (vibemacs-worktrees--get-last-active-buffer-name entry))
+                 (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
+                 ;; Check if last buffer is still valid (exists and is a chat/agent buffer)
+                 (last-buffer-valid (and (buffer-live-p last-buffer)
+                                         (or (string-match-p "\\*vibemacs Agent" last-buffer-name)
+                                             (string-match-p "\\*vibemacs Chat" last-buffer-name))))
+                 (buffer (if last-buffer-valid
+                             last-buffer
+                           ;; Check if any chat/agent tabs exist, otherwise default to codex
+                           (or (vibemacs-worktrees--has-any-chat-tabs entry)
+                               (vibemacs-worktrees--create-agent-tab entry "codex" nil)))))
+            (when buffer
+              ;; Use switch-to-buffer to preserve window buffer history for tab-line
+              (switch-to-buffer buffer nil t)
+              (dolist (win (get-buffer-window-list buffer nil t))
+                (unless (eq win window)
+                  (delete-window win))))))
+        (force-mode-line-update t)))))
 
 (defun vibemacs-worktrees-center-show-terminal (&optional entry)
   "Activate the terminal tab in the center pane for ENTRY."
