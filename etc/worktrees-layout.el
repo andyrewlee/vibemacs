@@ -127,17 +127,24 @@ When ENTRY is nil, reuse the currently active worktree."
                (last-buffer-valid (and (buffer-live-p last-buffer)
                                       (or (string-match-p "\\*vibemacs Agent" last-buffer-name)
                                           (string-match-p "\\*vibemacs Chat" last-buffer-name))))
+               (existing-chat-tab (vibemacs-worktrees--has-any-chat-tabs entry))
                (buffer (cond
                         ;; First priority: restore saved chat/agent buffer if valid
                         (last-buffer-valid
                          last-buffer)
                         ;; Second priority: use any existing chat/agent tab
-                        ((vibemacs-worktrees--has-any-chat-tabs entry))
-                        ;; Third priority: prompt for agent selection
+                        (existing-chat-tab
+                         existing-chat-tab)
+                        ;; Third priority: try default chat buffer
                         (t
-                         (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
-                                (agent (completing-read "Select agent: " assistants nil t)))
-                           (vibemacs-worktrees--create-agent-tab entry agent nil))))))
+                         (condition-case err
+                             (vibemacs-worktrees--chat-buffer entry)
+                           (error
+                            ;; If chat buffer fails, prompt for agent selection
+                            (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
+                                   (agent (completing-read "Select agent: " assistants nil t)))
+                              (when agent
+                                (vibemacs-worktrees--create-agent-tab entry agent t)))))))))
           (when buffer
             ;; Use switch-to-buffer to preserve window buffer history for tab-line
             (switch-to-buffer buffer nil t)
