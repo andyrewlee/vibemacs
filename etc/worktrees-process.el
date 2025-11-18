@@ -204,12 +204,16 @@ Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid.
       (message "[worktrees] Config file not found or not readable")
       nil)))
 
-(defun vibemacs-worktrees--run-setup-command (cmd-list target-path repo name index)
+(defun vibemacs-worktrees--run-setup-command (cmd-list target-path repo name index on-success on-failure)
   "Run setup commands sequentially from CMD-LIST.
 TARGET-PATH is the new worktree path, REPO is the root worktree,
-NAME is the worktree name, and INDEX is the current command index."
+NAME is the worktree name, and INDEX is the current command index.
+ON-SUCCESS is called when all commands complete successfully.
+ON-FAILURE is called with error message if any command fails."
   (if (null cmd-list)
-      (message "[worktrees] All setup commands completed for %s" name)
+      (progn
+        (message "[worktrees] All setup commands completed for %s" name)
+        (when on-success (funcall on-success)))
     (let* ((cmd (car cmd-list))
            (remaining (cdr cmd-list))
            (default-directory target-path)
@@ -237,16 +241,20 @@ NAME is the worktree name, and INDEX is the current command index."
                    (message "[worktrees] ✓ Command completed: %s" expanded-cmd)
                    ;; Run next command
                    (vibemacs-worktrees--run-setup-command
-                    remaining target-path repo name (1+ index)))
-               (message "[worktrees] ✗ Command failed (exit %d): %s\nSee buffer: %s"
-                        (process-exit-status process)
-                        expanded-cmd
-                        (buffer-name (process-buffer process)))))))))))
+                    remaining target-path repo name (1+ index) on-success on-failure))
+               (let ((error-msg (format "Command failed (exit %d): %s\nSee buffer: %s"
+                                        (process-exit-status process)
+                                        expanded-cmd
+                                        (buffer-name (process-buffer process)))))
+                 (message "[worktrees] ✗ %s" error-msg)
+                 (when on-failure (funcall on-failure error-msg)))))))))))
 
-(defun vibemacs-worktrees--run-setup-commands (repo target-path name)
+(defun vibemacs-worktrees--run-setup-commands (repo target-path name on-success on-failure)
   "Run setup commands from .vibemacs/worktrees.json config.
 REPO is the root worktree path, TARGET-PATH is the new worktree path,
-and NAME is the worktree name."
+and NAME is the worktree name.
+ON-SUCCESS is called when all commands complete successfully.
+ON-FAILURE is called with error message if any command fails."
   (message "[worktrees] Starting setup for worktree: %s" name)
   (message "[worktrees] Root worktree: %s" repo)
   (message "[worktrees] Target path: %s" target-path)
@@ -263,8 +271,11 @@ and NAME is the worktree name."
         (progn
           (message "[worktrees] Found %d setup command(s)" (length commands))
           ;; Start running commands sequentially
-          (vibemacs-worktrees--run-setup-command commands target-path repo name 0))
-      (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json"))))
+          (vibemacs-worktrees--run-setup-command commands target-path repo name 0 on-success on-failure))
+      (progn
+        (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json")
+        ;; No setup commands, call success immediately
+        (when on-success (funcall on-success))))))
 
 ;;; Worktree Creation and Archival
 
@@ -313,8 +324,7 @@ and NAME is the worktree name."
         (vibemacs-worktrees--register entry)
         (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
         (vibemacs-worktrees--save-metadata entry metadata)
-        ;; Run setup commands from .vibemacs/worktrees.json
-        (vibemacs-worktrees--run-setup-commands repo target-path name)
+        ;; Activate UI immediately so user is switched to the new worktree
         (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
                                   vibemacs-worktrees--center-window)))
           (vibemacs-worktrees-dashboard--activate entry)
@@ -334,7 +344,19 @@ and NAME is the worktree name."
               (vibemacs-worktrees-open-terminal entry))
             (when (file-directory-p target-path)
               (dired target-path))))
-        (message "Worktree %s ready at %s" name target-path)
+        ;; Show initial message
+        (message "Worktree %s created, running setup..." name)
+        ;; Define callbacks for setup completion
+        (let ((complete-setup
+               (lambda ()
+                 (message "Worktree %s ready at %s" name target-path)))
+              (handle-failure
+               (lambda (error-msg)
+                 (message "Worktree setup failed for %s: %s" name error-msg)
+                 (message "Worktree created at %s but setup incomplete" target-path))))
+          ;; Run setup commands from .vibemacs/worktrees.json
+          ;; "Ready" message only shows after all commands complete successfully
+          (vibemacs-worktrees--run-setup-commands repo target-path name complete-setup handle-failure))
         entry))))
 
 ;;;###autoload
