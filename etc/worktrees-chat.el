@@ -139,19 +139,18 @@ Returns the created buffer."
               (vterm-send-string command)
               (vterm-send-return)
               (setq-local vibemacs-worktrees--chat-command-started t)))))
+      ;; Always configure tab-line for the buffer
+      (when buffer
+        (with-current-buffer buffer
+          (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+          (tab-line-mode 1)))
       ;; Optionally display the buffer in the center window
       (when (and buffer switch-to-buffer-p)
         (if (window-live-p vibemacs-worktrees--center-window)
             (with-selected-window vibemacs-worktrees--center-window
-              (switch-to-buffer buffer)
-              ;; Configure tab-line to only show file and agent buffers
-              (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
-              ;; Enable tab-line-mode so it shows as a tab
-              (tab-line-mode 1))
+              (switch-to-buffer buffer))
           ;; Fallback if center window doesn't exist
-          (switch-to-buffer buffer)
-          (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
-          (tab-line-mode 1)))
+          (switch-to-buffer buffer)))
       buffer)))
 
 (defun vibemacs-worktrees-new-agent-tab ()
