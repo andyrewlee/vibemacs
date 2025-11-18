@@ -133,7 +133,7 @@ When ENTRY is nil, reuse the currently active worktree."
                         (or (vibemacs-worktrees--has-any-chat-tabs entry)
                             (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
                                    (agent (completing-read "Select agent: " assistants nil t)))
-                              (vibemacs-worktrees--create-agent-tab entry agent nil)))))))
+                              (vibemacs-worktrees--create-agent-tab entry agent nil))))))
           (when buffer
             ;; Use switch-to-buffer to preserve window buffer history for tab-line
             (switch-to-buffer buffer nil t)
