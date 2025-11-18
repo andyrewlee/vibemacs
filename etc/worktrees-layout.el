@@ -120,31 +120,20 @@ When ENTRY is nil, reuse the currently active worktree."
       (set-window-parameter window 'vibemacs-center-active 'chat)
 
       (with-selected-window window
-        ;; Try to restore last active chat/agent buffer or prompt for agent
+        ;; Try to restore last active buffer, fall back to chat
         (let* ((last-buffer-name (vibemacs-worktrees--get-last-active-buffer-name entry))
                (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
-               ;; Only restore if it's still a chat/agent buffer
+               ;; Check if last buffer is still valid (exists and is a chat/agent buffer)
                (last-buffer-valid (and (buffer-live-p last-buffer)
                                       (or (string-match-p "\\*vibemacs Agent" last-buffer-name)
                                           (string-match-p "\\*vibemacs Chat" last-buffer-name))))
-               (existing-chat-tab (vibemacs-worktrees--has-any-chat-tabs entry))
-               (buffer (cond
-                        ;; First priority: restore saved chat/agent buffer if valid
-                        (last-buffer-valid
-                         last-buffer)
-                        ;; Second priority: use any existing chat/agent tab
-                        (existing-chat-tab
-                         existing-chat-tab)
-                        ;; Third priority: try default chat buffer
-                        (t
-                         (condition-case err
-                             (vibemacs-worktrees--chat-buffer entry)
-                           (error
-                            ;; If chat buffer fails, prompt for agent selection
+               (buffer (if last-buffer-valid
+                          last-buffer
+                        ;; Check if any chat/agent tabs exist, otherwise prompt
+                        (or (vibemacs-worktrees--has-any-chat-tabs entry)
                             (let* ((assistants (mapcar #'car vibemacs-worktrees-chat-assistants))
                                    (agent (completing-read "Select agent: " assistants nil t)))
-                              (when agent
-                                (vibemacs-worktrees--create-agent-tab entry agent t)))))))))
+                              (vibemacs-worktrees--create-agent-tab entry agent nil)))))))
           (when buffer
             ;; Use switch-to-buffer to preserve window buffer history for tab-line
             (switch-to-buffer buffer nil t)
