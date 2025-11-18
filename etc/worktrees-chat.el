@@ -256,7 +256,8 @@ to the current buffer."
   (interactive)
   (unless (derived-mode-p 'vterm-mode)
     (user-error "This command must be run from a chat or agent buffer"))
-  (let ((task (read-string "Task to research: ")))
+  (let ((vterm-buffer (current-buffer))
+        (task (read-string "Task to research: ")))
     (when (string-empty-p task)
       (user-error "Task description cannot be empty"))
     ;; Build the research prompt
@@ -274,9 +275,10 @@ Deliverable:
 Provide a structured summary of your findings, listing relevant file paths, describing relationships, and including code snippets when useful.
 
 Task to research: %s" task)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
-      (vterm-send-return)
+      ;; Send the prompt to the vterm buffer
+      (with-current-buffer vterm-buffer
+        (vterm-send-string prompt)
+        (vterm-send-return))
       (message "Sent research request for task"))))
 
 (defun vibemacs-worktrees-create-plan ()
@@ -286,7 +288,8 @@ prompt to the current buffer."
   (interactive)
   (unless (derived-mode-p 'vterm-mode)
     (user-error "This command must be run from a chat or agent buffer"))
-  (let ((file-name (read-string "Plan file name (e.g., editor-refactor): "))
+  (let ((vterm-buffer (current-buffer))
+        (file-name (read-string "Plan file name (e.g., editor-refactor): "))
         (task (read-string "Task description: ")))
     (when (string-empty-p file-name)
       (user-error "File name cannot be empty"))
@@ -309,9 +312,10 @@ All stories in a phase should pass when that phase's checklist is complete.
 If no research was done, infer likely areas of the codebase and make reasonable assumptions.
 
 Task to plan for: %s" file-name task)))
-      ;; Send the prompt to current vterm buffer
-      (vterm-send-string prompt)
-      (vterm-send-return)
+      ;; Send the prompt to the vterm buffer
+      (with-current-buffer vterm-buffer
+        (vterm-send-string prompt)
+        (vterm-send-return))
       (message "Sent plan creation request for plans/%s.md" file-name))))
 
 ;; Set up keybindings
