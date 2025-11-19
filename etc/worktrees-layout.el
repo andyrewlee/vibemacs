@@ -307,7 +307,7 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          (frame-width (window-total-width root))
          (min-left 18)
          (max-left 22)
-         (min-center 80)
+         (min-center 100)
          (auto-left (max min-left (min max-left (floor (* frame-width 0.12)))))
          (desired (or vibemacs-worktrees-startup-left-width 20))
          (left-width (min max-left (max min-left (min desired auto-left))))
