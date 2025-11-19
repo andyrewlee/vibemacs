@@ -65,7 +65,8 @@ When ENTRY is nil, use the currently active worktree."
                 (ignore-errors (tabulated-list-get-id)))))))
     (or (and (window-live-p vibemacs-worktrees--center-window)
              (window-parameter vibemacs-worktrees--center-window 'vibemacs-center-entry))
-        (when (and dashboard-entry (not (eq dashboard-entry :create)))
+        (when (and (stringp dashboard-entry)
+                   (not (eq dashboard-entry :create)))
           (cl-find dashboard-entry entries
                    :test #'string=
                    :key #'vibemacs-worktrees--entry-root))
@@ -246,8 +247,7 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
 
 
 (defun vibemacs-worktrees--apply-startup-layout (&optional force)
-  "Arrange the initial dashboard + welcome layout.
-When FORCE is non-nil, rebuild the layout even if it already ran."
+  "Arrange the initial dashboard + welcome layout."
   (when (and vibemacs-worktrees-startup-layout
              (or force (not vibemacs-worktrees--startup-applied)))
     (let ((frame (selected-frame)))
@@ -264,7 +264,8 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
            (welcome-buffer (vibemacs-worktrees-welcome))
            (desired-left (or vibemacs-worktrees-startup-left-width 24)))
       (condition-case _err
-          (let ((left-window (split-window root-window desired-left 'left)))
+          (let* ((left-window (split-window root-window desired-left 'left))
+                 (welcome-window (if left-window root-window left-window)))
             (when left-window
               (window-resize left-window (- desired-left (window-total-width left-window)) t)
               (set-window-buffer left-window dashboard-buffer)
@@ -272,10 +273,11 @@ When FORCE is non-nil, rebuild the layout even if it already ran."
               (set-window-parameter left-window 'window-size-fixed 'width)
               (set-window-parameter left-window 'no-delete-other-windows t)
               (set-window-parameter left-window 'window-preserved-size (cons 'width desired-left)))
-            (set-window-buffer root-window welcome-buffer)
-            (setq vibemacs-worktrees--center-window root-window)
-            (setq vibemacs-worktrees--right-window nil)
-            (setq vibemacs-worktrees--terminal-window nil))
+            (when welcome-window
+              (set-window-buffer welcome-window welcome-buffer)
+              (setq vibemacs-worktrees--center-window welcome-window)
+              (setq vibemacs-worktrees--right-window nil)
+              (setq vibemacs-worktrees--terminal-window nil)))
         (error
          (set-window-buffer root-window dashboard-buffer)
          (set-window-dedicated-p root-window t)
