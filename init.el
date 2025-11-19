@@ -10,6 +10,8 @@
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
+;; Always prefer fresh .el over stale .elc so layout fixes load immediately.
+(setq load-prefer-newer t)
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)

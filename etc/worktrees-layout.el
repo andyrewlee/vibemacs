@@ -308,7 +308,6 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
     (set-window-buffer root welcome-buffer)
     ;; Track windows so later layout switches know what to reuse
     (setq vibemacs-worktrees--dashboard-window (and (window-live-p left) left))
-    (setq vibemacs-worktrees--center-window-root root)
     (setq vibemacs-worktrees--center-window root)
     (setq vibemacs-worktrees--right-window nil)
     (setq vibemacs-worktrees--terminal-window nil)
@@ -388,7 +387,7 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
          (set-window-parameter chat-window 'window-size-fixed 'width)
          (set-window-parameter chat-window 'no-delete-other-windows t)
          (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
-         (setq vibemacs-worktrees--dashboard-window chat-window)
+         (setq vibemacs-worktrees--dashboard-window dashboard-window)
           (when status-window
             (let ((status-win (or git-status-window dashboard-window)))
               (set-window-buffer status-win git-status-buffer)
