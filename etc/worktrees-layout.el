@@ -296,24 +296,20 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
          (welcome-buffer (vibemacs-worktrees-welcome))
          (desired-left (or vibemacs-worktrees-startup-left-width 24))
-         (left (split-window root desired-left 'left))
-         (center (or root left)))
+         (left (split-window root desired-left 'left)))
     ;; Left = dashboard
-    (when left
-      (set-window-buffer left dashboard-buffer)
-      (set-window-dedicated-p left t)
-      (set-window-parameter left 'window-size-fixed 'width)
-      (set-window-parameter left 'no-delete-other-windows t)
-      (set-window-parameter left 'window-preserved-size (cons 'width desired-left))
-      (setq vibemacs-worktrees--right-window nil)
-      (setq vibemacs-worktrees--terminal-window nil))
+    (set-window-buffer left dashboard-buffer)
+    (set-window-dedicated-p left t)
+    (set-window-parameter left 'window-size-fixed 'width)
+    (set-window-parameter left 'no-delete-other-windows t)
+    (set-window-parameter left 'window-preserved-size (cons 'width desired-left))
     ;; Center = welcome
-    (when center
-      (set-window-buffer center welcome-buffer)
-      (setq vibemacs-worktrees--center-window center)
-      (set-window-dedicated-p center nil)
-      (select-window center))
+    (set-window-buffer root welcome-buffer)
     (setq vibemacs-worktrees--dashboard-window left)
+    (setq vibemacs-worktrees--center-window root)
+    (setq vibemacs-worktrees--right-window nil)
+    (setq vibemacs-worktrees--terminal-window nil)
+    (select-window root)
     (setq vibemacs-worktrees--startup-applied t)))
 
 ;;;###autoload
