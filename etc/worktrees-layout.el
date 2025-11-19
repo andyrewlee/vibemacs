@@ -81,6 +81,27 @@ When ENTRY is nil, use the currently active worktree."
     (remove-hook 'kill-buffer-hook #'vibemacs-worktrees-center--terminal-closed t)
     (vibemacs-worktrees-center-show-chat)))
 
+;;; Helper for strict tab management
+
+(defun vibemacs-worktrees--add-to-tabs (buffer)
+  "Add BUFFER to the explicit tab list for the center window.
+If the window has \\='vibemacs-explicit-tabs parameter, append to it.
+Otherwise initialize it with just this buffer.
+Falls back to selected window if center window is not available."
+  (let ((target-window (if (and (boundp 'vibemacs-worktrees--center-window)
+                                (window-live-p vibemacs-worktrees--center-window))
+                           vibemacs-worktrees--center-window
+                         (selected-window))))
+    (when (and (window-live-p target-window)
+               (buffer-live-p buffer))
+      (let* ((current-tabs (window-parameter target-window 'vibemacs-explicit-tabs))
+             ;; Clean dead buffers first
+             (clean-tabs (seq-filter #'buffer-live-p current-tabs))
+             (new-tabs (if (member buffer clean-tabs)
+                           clean-tabs
+                         (append clean-tabs (list buffer)))))
+        (set-window-parameter target-window 'vibemacs-explicit-tabs new-tabs)))))
+
 (defun vibemacs-worktrees-center-show-chat (&optional entry)
   "Activate the chat tab in the center pane for ENTRY.
 When ENTRY is nil, reuse the currently active worktree."
@@ -112,9 +133,10 @@ When ENTRY is nil, reuse the currently active worktree."
                    previous-entry
                    buf-name))))))
 
-        ;; Reset tab order when switching to a different worktree
+        ;; Reset tabs when switching to a different worktree
         (when switching-worktrees
-          (set-window-parameter window 'vibemacs-tab-order nil))
+          (set-window-parameter window 'vibemacs-tab-order nil)
+          (set-window-parameter window 'vibemacs-explicit-tabs nil))
 
         (set-window-parameter window 'vibemacs-center-entry entry)
         (set-window-parameter window 'vibemacs-center-active 'chat)
@@ -135,6 +157,9 @@ When ENTRY is nil, reuse the currently active worktree."
                                       (assistant (vibemacs-worktrees--metadata-assistant metadata)))
                                  (vibemacs-worktrees--create-agent-tab entry assistant nil))))))
             (when buffer
+              ;; Explicitly track this buffer in the strict tab list
+              (vibemacs-worktrees--add-to-tabs buffer)
+              
               ;; Use switch-to-buffer to preserve window buffer history for tab-line
               (switch-to-buffer buffer nil t)
               (dolist (win (get-buffer-window-list buffer nil t))

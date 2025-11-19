@@ -194,12 +194,25 @@ Returns the created buffer."
           (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
           (tab-line-mode 1)))
       ;; Optionally display the buffer in the center window
-      (when (and buffer switch-to-buffer-p)
-        (if (window-live-p vibemacs-worktrees--center-window)
+      (when buffer
+        ;; Ensure the new buffer is added to the strict tab list
+        (when (fboundp 'vibemacs-worktrees--add-to-tabs)
+          ;; We need to temporarily select the center window if it exists
+          ;; because vibemacs-worktrees--add-to-tabs checks vibemacs-worktrees--center-window
+          (if (and (boundp 'vibemacs-worktrees--center-window)
+                   (window-live-p vibemacs-worktrees--center-window))
+              (with-selected-window vibemacs-worktrees--center-window
+                (vibemacs-worktrees--add-to-tabs buffer))
+            ;; Fallback if center window isn't set (unlikely in dashboard)
+            (vibemacs-worktrees--add-to-tabs buffer)))
+        
+        (if (and switch-to-buffer-p
+                 (window-live-p vibemacs-worktrees--center-window))
             (with-selected-window vibemacs-worktrees--center-window
               (switch-to-buffer buffer))
-          ;; Fallback if center window doesn't exist
-          (switch-to-buffer buffer)))
+          ;; Fallback if center window doesn't exist or we don't switch
+          (when switch-to-buffer-p
+            (switch-to-buffer buffer))))
       buffer)))
 
 (defun vibemacs-worktrees-new-agent-tab ()
@@ -227,44 +240,50 @@ Order is persisted per worktree so it survives buffer switches and reflows."
          (order-key (or current-root :global))
          (current-buf (current-buffer))
          (tab-order (gethash order-key vibemacs-worktrees--tab-orders))
-         ;; Also consider Emacs' own buffer history for the window so we don't lose tabs
-         (window-history (mapcar #'car (window-prev-buffers window))))
+         ;; Use explicit list if available, otherwise fallback to filtered window history
+         (explicit-tabs (window-parameter window 'vibemacs-explicit-tabs)))
 
-    ;; Merge history + existing order, then ensure current buffer is tracked.
-    (dolist (buf (append window-history (list current-buf)))
-      (when (buffer-live-p buf)
-        (unless (member buf tab-order)
-          (setq tab-order (append tab-order (list buf))))))
-    (puthash order-key tab-order vibemacs-worktrees--tab-orders)
+    (if explicit-tabs
+        ;; In strict mode, only show tabs explicitly added to the list
+        (seq-filter #'buffer-live-p explicit-tabs)
 
-    ;; Drop dead buffers and persist.
-    (let ((cleaned (seq-filter #'buffer-live-p tab-order)))
-      (unless (equal cleaned tab-order)
-        (setq tab-order cleaned)
-        (puthash order-key tab-order vibemacs-worktrees--tab-orders)))
+      ;; Legacy behavior (fallback)
+      (let ((window-history (mapcar #'car (window-prev-buffers window))))
+        ;; Merge history + existing order, then ensure current buffer is tracked.
+        (dolist (buf (append window-history (list current-buf)))
+          (when (buffer-live-p buf)
+            (unless (member buf tab-order)
+              (setq tab-order (append tab-order (list buf))))))
+        (puthash order-key tab-order vibemacs-worktrees--tab-orders)
 
-    ;; Filter to current worktree membership, preserving order.
-    (seq-filter
-     (lambda (buf)
-       (and (buffer-live-p buf)
-            (with-current-buffer buf
-              (cond
-               ;; Files scoped by root.
-               ((buffer-file-name)
-                (or (not current-root)
-                    (let ((file-path (expand-file-name (buffer-file-name)))
-                          (root-path (file-name-as-directory (expand-file-name current-root))))
-                      (string-prefix-p root-path file-path))))
-               ;; Agent/chat buffers scoped by stored buffer root.
-               ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
-                    (string-match-p "\\*vibemacs Chat" (buffer-name)))
-                (or (not current-root)
-                    (and (boundp 'vibemacs-worktrees--buffer-root)
-                         vibemacs-worktrees--buffer-root
-                         (string= (expand-file-name vibemacs-worktrees--buffer-root)
-                                 (expand-file-name current-root)))))
-               (t nil)))))
-     tab-order)))
+        ;; Drop dead buffers and persist.
+        (let ((cleaned (seq-filter #'buffer-live-p tab-order)))
+          (unless (equal cleaned tab-order)
+            (setq tab-order cleaned)
+            (puthash order-key tab-order vibemacs-worktrees--tab-orders)))
+
+        ;; Filter to current worktree membership, preserving order.
+        (seq-filter
+         (lambda (buf)
+           (and (buffer-live-p buf)
+                (with-current-buffer buf
+                  (cond
+                   ;; Files scoped by root.
+                   ((buffer-file-name)
+                    (or (not current-root)
+                        (let ((file-path (expand-file-name (buffer-file-name)))
+                              (root-path (file-name-as-directory (expand-file-name current-root))))
+                          (string-prefix-p root-path file-path))))
+                   ;; Agent/chat buffers scoped by stored buffer root.
+                   ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
+                        (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                    (or (not current-root)
+                        (and (boundp 'vibemacs-worktrees--buffer-root)
+                             vibemacs-worktrees--buffer-root
+                             (string= (expand-file-name vibemacs-worktrees--buffer-root)
+                                     (expand-file-name current-root)))))
+                   (t nil)))))
+         tab-order)))))
 
 (defun vibemacs-worktrees-chat-send-interrupt ()
   "Send one or more C-c interrupts to the active chat assistant."

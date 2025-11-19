@@ -47,6 +47,8 @@
       (add-hook 'kill-buffer-hook #'vibemacs-worktrees-git-status--stop-auto-refresh nil t))
     buffer))
 
+(declare-function vibemacs-worktrees--add-to-tabs "worktrees-layout")
+
 (defun vibemacs-worktrees-git-status-open-file ()
   "Open the file at point in the center window (shows as tab with tab-line-mode)."
   (interactive)
@@ -56,7 +58,10 @@
     (when (and file (window-live-p vibemacs-worktrees--center-window))
       (with-selected-window vibemacs-worktrees--center-window
         ;; Open file - tab-line-mode will automatically show it as a tab
-        (find-file (expand-file-name file root))))))
+        (find-file (expand-file-name file root))
+        ;; Add to strict tab list
+        (when (fboundp 'vibemacs-worktrees--add-to-tabs)
+          (vibemacs-worktrees--add-to-tabs (current-buffer)))))))
 
 (defun vibemacs-worktrees-git-status-refresh ()
   "Refresh the git status sidebar for the current worktree."
