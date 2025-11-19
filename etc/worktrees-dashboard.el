@@ -241,6 +241,7 @@ HELP overrides the default hover tooltip."
     (if projects
         (progn
           (push (vibemacs-worktrees-dashboard--home-entry) rows)
+          ;; Preserve registry order: projects is already in saved order.
           (dolist (project projects)
             (push (vibemacs-worktrees-dashboard--project-entry project) rows)
             (push (vibemacs-worktrees-dashboard--create-entry project) rows)
@@ -428,9 +429,16 @@ HELP overrides the default hover tooltip."
   ;; Ensure dashboard buffer exists and refresh it immediately.
   (let ((buffer (vibemacs-worktrees-dashboard--setup-buffer)))
     (with-current-buffer buffer
-      (vibemacs-worktrees-dashboard--rebuild))
-    (when (window-live-p vibemacs-worktrees--dashboard-window)
-      (set-window-buffer vibemacs-worktrees--dashboard-window buffer)))
+      (vibemacs-worktrees-dashboard--rebuild)
+      (tabulated-list-print t))
+    ;; Refresh any visible dashboard window in place.
+    (when-let ((win (or (and (window-live-p vibemacs-worktrees--dashboard-window)
+                             vibemacs-worktrees--dashboard-window)
+                        (get-buffer-window buffer t))))
+      (set-window-buffer win buffer)
+      (with-selected-window win
+        (when (bound-and-true-p hl-line-mode)
+          (hl-line-highlight)))))
   (message "Added project %s" path))
 
 (defun vibemacs-worktrees-dashboard-toggle-dirty-filter ()
