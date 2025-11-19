@@ -295,8 +295,20 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
   (let* ((root (selected-window))
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
          (welcome-buffer (vibemacs-worktrees-welcome))
-         (desired-left (or vibemacs-worktrees-startup-left-width 24))
-         (left (split-window root desired-left 'left)))
+         ;; Size the dashboard to a sensible fraction of the frame.
+         (frame-width (window-total-width root))
+         (min-left 18)
+         (max-left 40)
+         (min-center 60)
+         (auto-left (max min-left (min max-left (floor (* frame-width 0.22)))))
+         (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
+         ;; Clamp to leave at least MIN-CENTER columns for the welcome pane.
+         (left-width
+          (max min-left
+               (min desired-left auto-left
+                    (max min-left (- frame-width min-center))))))
+         (left (when (> frame-width (+ min-left 5))
+                 (split-window root left-width 'left))))
     ;; Ensure the center window can be reused after previous dedicated layouts.
     (set-window-dedicated-p root nil)
     (set-window-parameter root 'window-size-fixed nil)
