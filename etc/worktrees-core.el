@@ -172,6 +172,9 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 (defvar vibemacs-worktrees--center-window nil
   "Window used for the central chat/terminal pane.")
 
+(defvar vibemacs-worktrees--center-window-root nil
+  "Root window used to reconstruct the center during layout changes.")
+
 (defvar vibemacs-worktrees--dashboard-window nil
   "Window showing the dashboard (tabulated list of worktrees).")
 
