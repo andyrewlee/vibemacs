@@ -10,6 +10,13 @@
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
+;; Start frames at a sane size so the home layout has room on launch.
+(setq frame-resize-pixelwise t)
+(add-to-list 'default-frame-alist '(width . 196))
+(add-to-list 'default-frame-alist '(height . 58))
+;; Respect widths even for the very first frame; carry height too.
+(add-to-list 'initial-frame-alist '(width . 196))
+(add-to-list 'initial-frame-alist '(height . 58))
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
