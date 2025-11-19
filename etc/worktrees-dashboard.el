@@ -425,7 +425,12 @@ HELP overrides the default hover tooltip."
                            (default-directory (expand-file-name "~/")))
                        (read-directory-name "Project path: " nil nil t))))
   (vibemacs-worktrees--register-project path)
-  (vibemacs-worktrees-dashboard--rebuild)
+  ;; Ensure dashboard buffer exists and refresh it immediately.
+  (let ((buffer (vibemacs-worktrees-dashboard--setup-buffer)))
+    (with-current-buffer buffer
+      (vibemacs-worktrees-dashboard--rebuild))
+    (when (window-live-p vibemacs-worktrees--dashboard-window)
+      (set-window-buffer vibemacs-worktrees--dashboard-window buffer)))
   (message "Added project %s" path))
 
 (defun vibemacs-worktrees-dashboard-toggle-dirty-filter ()
