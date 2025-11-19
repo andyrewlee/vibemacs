@@ -297,6 +297,11 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          (welcome-buffer (vibemacs-worktrees-welcome))
          (desired-left (or vibemacs-worktrees-startup-left-width 24))
          (left (split-window root desired-left 'left)))
+    ;; Ensure the center window can be reused after previous dedicated layouts.
+    (set-window-dedicated-p root nil)
+    (set-window-parameter root 'window-size-fixed nil)
+    (set-window-parameter root 'no-delete-other-windows nil)
+    (set-window-parameter root 'window-preserved-size nil)
     ;; Left = dashboard
     (when (window-live-p left)
       (set-window-buffer left dashboard-buffer)
