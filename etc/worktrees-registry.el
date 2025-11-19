@@ -81,6 +81,7 @@
   (let* ((existing (vibemacs-worktrees--load-registry))
          (expanded-path (expand-file-name path))
          (normalized-path (directory-file-name expanded-path)))
+    (setq existing (delete normalized-path existing)) ;; remove if already present
     (unless (member normalized-path existing)
       ;; Append to preserve the user's existing order; new projects go to the end.
       (vibemacs-worktrees--save-registry (append existing (list normalized-path))))))
