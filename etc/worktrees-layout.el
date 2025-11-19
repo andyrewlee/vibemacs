@@ -295,37 +295,40 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
   (let* ((root (selected-window))
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
          (welcome-buffer (vibemacs-worktrees-welcome))
-         ;; Size the dashboard to a sensible fraction of the frame.
+         ;; Compute a stable left width, clamped but leaving room for center.
          (frame-width (window-total-width root))
          (min-left 18)
-         (max-left 40)
+         (max-left 36)
          (min-center 60)
-         (auto-left (max min-left (min max-left (floor (* frame-width 0.22)))))
-         (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
-         ;; Clamp to leave at least MIN-CENTER columns for the welcome pane.
-         (left-width
-          (max min-left
-               (min desired-left auto-left
-                    (max min-left (- frame-width min-center))))))
-         (left (when (> frame-width (+ min-left 5))
-                 (split-window root left-width 'left))))
+         (desired (or vibemacs-worktrees-startup-left-width 24))
+         (left-width (min (max desired min-left) max-left))
+         (usable-left (max min-left (min left-width (max min-left (- frame-width min-center))))))
     ;; Ensure the center window can be reused after previous dedicated layouts.
     (set-window-dedicated-p root nil)
     (set-window-parameter root 'window-size-fixed nil)
     (set-window-parameter root 'no-delete-other-windows nil)
     (set-window-parameter root 'window-preserved-size nil)
-    ;; Left = dashboard
-    (when (window-live-p left)
-      (set-window-buffer left dashboard-buffer)
-      (set-window-dedicated-p left t)
-      (set-window-parameter left 'window-size-fixed 'width)
-      (set-window-parameter left 'no-delete-other-windows t)
-      (set-window-parameter left 'window-preserved-size (cons 'width desired-left)))
-    ;; Center = welcome
-    (set-window-buffer root welcome-buffer)
-    ;; Track windows so later layout switches know what to reuse
-    (setq vibemacs-worktrees--dashboard-window (and (window-live-p left) left))
-    (setq vibemacs-worktrees--center-window root)
+    (if (< frame-width (+ min-left min-center))
+        ;; Too narrow: just show welcome buffer full width
+        (progn
+          (set-window-buffer root welcome-buffer)
+          (setq vibemacs-worktrees--dashboard-window nil)
+          (setq vibemacs-worktrees--center-window root))
+      ;; Split and size explicitly so the dashboard doesn't dominate.
+      (let ((left (split-window root usable-left 'left)))
+        (when (window-live-p left)
+          ;; Resize to exact width because split-window may round differently.
+          (let ((delta (- usable-left (window-total-width left))))
+            (when (/= delta 0)
+              (window-resize left delta t)))
+          (set-window-buffer left dashboard-buffer)
+          (set-window-dedicated-p left t)
+          (set-window-parameter left 'window-size-fixed 'width)
+          (set-window-parameter left 'no-delete-other-windows t)
+          (set-window-parameter left 'window-preserved-size (cons 'width usable-left)))
+        (set-window-buffer root welcome-buffer)
+        (setq vibemacs-worktrees--dashboard-window (and (window-live-p left) left))
+        (setq vibemacs-worktrees--center-window root)))
     (setq vibemacs-worktrees--right-window nil)
     (setq vibemacs-worktrees--terminal-window nil)
     (select-window root)
