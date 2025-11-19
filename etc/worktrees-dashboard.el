@@ -207,10 +207,9 @@ HELP overrides the default hover tooltip."
                 "Press RET to register a repository")))
     (list '(:add-project . nil) (vector label))))
 
-(defun vibemacs-worktrees-dashboard--worktree-entry (entry)
-  "Return a formatted row for a worktree ENTRY."
+(defun vibemacs-worktrees-dashboard--worktree-entry (entry status-info codex-str)
+  "Return a formatted row for ENTRY using STATUS-INFO and CODEX-STR."
   (let* ((root (vibemacs-worktrees--entry-root entry))
-         (metadata (vibemacs-worktrees--load-metadata entry))
          (repo-path (vibemacs-worktrees--entry-repo entry))
          (active (and vibemacs-worktrees--active-root
                       (string= root vibemacs-worktrees--active-root)))
@@ -223,10 +222,8 @@ HELP overrides the default hover tooltip."
                     "RET: activate main • Tabs switch panes • Codex/chat ready"))
          (name-str (vibemacs-worktrees--entry-name entry))
          (branch-str (vibemacs-worktrees--entry-branch entry))
-         (status-info (vibemacs-worktrees-dashboard--git-summary entry))
          (dirty-count (car status-info))
          (status-str (cdr status-info))
-         (codex-str (vibemacs-worktrees-dashboard--codex-summary metadata))
          (display-str
           (concat (vibemacs-worktrees-dashboard--format-cell name-str row-face entry tooltip)
                   (propertize " (" 'face 'shadow)
@@ -249,10 +246,12 @@ HELP overrides the default hover tooltip."
             (push (vibemacs-worktrees-dashboard--create-entry project) rows)
             (dolist (entry (vibemacs-project-worktrees project))
               (let* ((status-info (vibemacs-worktrees-dashboard--git-summary entry))
-                     (dirty-count (car status-info)))
+                     (dirty-count (car status-info))
+                     (metadata (vibemacs-worktrees--load-metadata entry))
+                     (codex-str (vibemacs-worktrees-dashboard--codex-summary metadata)))
                 (when (or (not (eq vibemacs-worktrees-dashboard--filter 'dirty))
                           (> dirty-count 0))
-                  (push (vibemacs-worktrees-dashboard--worktree-entry entry) rows))))
+                  (push (vibemacs-worktrees-dashboard--worktree-entry entry status-info codex-str) rows))))
             (push (list `(:spacer . ,(vibemacs-project-name project)) (vector "")) rows))
           (nreverse rows))
       (list (vibemacs-worktrees-dashboard--add-project-entry)))))
@@ -361,18 +360,13 @@ HELP overrides the default hover tooltip."
 
 (defun vibemacs-worktrees-dashboard--rebuild ()
   "Regenerate and display dashboard entries."
-  (vibemacs-worktrees-dashboard--refresh)
-  (tabulated-list-print t)
-  (vibemacs-worktrees-dashboard--render-empty-state))
-
-(defun vibemacs-worktrees-dashboard--render-empty-state ()
-  "Render an empty-state message when no worktrees exist."
-  (when (null (cdr tabulated-list-entries)) ; Only create row exists
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert "\n  No worktrees yet.\n")
-      (insert "  • Click \"+ Create\" above or press `n` to walk through the setup.\n")
-      (insert "  • Once created, vibemacs will list each worktree here with status, Codex activity, and quick actions.\n"))))
+  (let ((target vibemacs-worktrees--active-root))
+    (vibemacs-worktrees-dashboard--refresh)
+    (tabulated-list-print t)
+    (when target
+      (ignore-errors (tabulated-list-goto-id target))
+      (when (derived-mode-p 'hl-line-mode)
+        (hl-line-highlight)))))
 
 (defun vibemacs-worktrees-dashboard--setup-buffer ()
   "Ensure the dashboard buffer exists and is populated, returning it."
@@ -394,13 +388,7 @@ HELP overrides the default hover tooltip."
   (when-let ((buffer (get-buffer vibemacs-worktrees-dashboard-buffer)))
     (with-current-buffer buffer
       (when (derived-mode-p 'vibemacs-worktrees-dashboard-mode)
-        (let ((target vibemacs-worktrees--active-root))
-          (vibemacs-worktrees-dashboard--refresh)
-          (tabulated-list-print t)
-          (vibemacs-worktrees-dashboard--render-empty-state)
-          (when target
-            (ignore-errors (tabulated-list-goto-id target)))
-          (hl-line-highlight)))))
+        (vibemacs-worktrees-dashboard--rebuild))))
   ;; Update the right terminal to the new worktree
   (when (fboundp 'vibemacs-worktrees-update-right-terminal)
     (vibemacs-worktrees-update-right-terminal entry)))
