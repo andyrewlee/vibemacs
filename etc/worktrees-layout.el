@@ -285,20 +285,50 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          (setq vibemacs-worktrees--right-window nil)
          (setq vibemacs-worktrees--terminal-window nil)))
       (setq vibemacs-worktrees--startup-applied t))))
+
+;; Home Layout ---------------------------------------------------------------
+
+(defun vibemacs-worktrees--apply-home-layout ()
+  "Force the minimal Home layout: dashboard on the left, welcome in center."
+  (let ((ignore-window-parameters t))
+    (delete-other-windows))
+  (let* ((root (selected-window))
+         (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
+         (welcome-buffer (vibemacs-worktrees-welcome))
+         (desired-left (or vibemacs-worktrees-startup-left-width 24))
+         (left (split-window root desired-left 'left))
+         (center (or root left)))
+    ;; Left = dashboard
+    (when left
+      (set-window-buffer left dashboard-buffer)
+      (set-window-dedicated-p left t)
+      (set-window-parameter left 'window-size-fixed 'width)
+      (set-window-parameter left 'no-delete-other-windows t)
+      (set-window-parameter left 'window-preserved-size (cons 'width desired-left))
+      (setq vibemacs-worktrees--right-window nil)
+      (setq vibemacs-worktrees--terminal-window nil))
+    ;; Center = welcome
+    (when center
+      (set-window-buffer center welcome-buffer)
+      (setq vibemacs-worktrees--center-window center)
+      (set-window-dedicated-p center nil)
+      (select-window center))
+    (setq vibemacs-worktrees--dashboard-window left)
+    (setq vibemacs-worktrees--startup-applied t)))
+
 ;;;###autoload
 (defun vibemacs-worktrees-launch-home (&optional force)
   "Launch the vibemacs dashboard layout.
 With FORCE (interactive prefix), rebuild the layout even if it was already applied."
   (interactive "P")
-  ;; Returning home should always clear the active worktree state and rebuild
-  ;; the lightweight dashboard + welcome layout.
+  ;; Returning home should always clear the active worktree state
   (setq vibemacs-worktrees--active-root nil)
   (setq vibemacs-worktrees--center-window nil)
   (setq vibemacs-worktrees--right-window nil)
   (setq vibemacs-worktrees--terminal-window nil)
   (setq vibemacs-worktrees--startup-applied nil)
   (if vibemacs-worktrees-startup-layout
-      (vibemacs-worktrees--apply-startup-layout (or force t))
+      (vibemacs-worktrees--apply-home-layout)
     (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
 
 (provide 'worktrees-layout)
