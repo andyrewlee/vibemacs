@@ -306,10 +306,11 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          ;; Compute a stable left width, clamped but leaving room for center.
          (frame-width (window-total-width root))
          (min-left 18)
-         (max-left 36)
+         (max-left 26)
          (min-center 60)
-         (desired (or vibemacs-worktrees-startup-left-width 24))
-         (left-width (min (max desired min-left) max-left))
+         (auto-left (max min-left (min max-left (floor (* frame-width 0.16)))))
+         (desired (or vibemacs-worktrees-startup-left-width 22))
+         (left-width (min max-left (max min-left (min desired auto-left))))
          (usable-left (max min-left (min left-width (max min-left (- frame-width min-center))))))
     ;; Ensure the center window can be reused after previous dedicated layouts.
     (set-window-dedicated-p root nil)
