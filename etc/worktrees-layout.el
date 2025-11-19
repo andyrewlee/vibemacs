@@ -290,10 +290,15 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
   "Launch the vibemacs dashboard layout.
 With FORCE (interactive prefix), rebuild the layout even if it was already applied."
   (interactive "P")
-  (when force
-    (setq vibemacs-worktrees--startup-applied nil))
+  ;; Returning home should always clear the active worktree state and rebuild
+  ;; the lightweight dashboard + welcome layout.
+  (setq vibemacs-worktrees--active-root nil)
+  (setq vibemacs-worktrees--center-window nil)
+  (setq vibemacs-worktrees--right-window nil)
+  (setq vibemacs-worktrees--terminal-window nil)
+  (setq vibemacs-worktrees--startup-applied nil)
   (if vibemacs-worktrees-startup-layout
-      (vibemacs-worktrees--apply-startup-layout force)
+      (vibemacs-worktrees--apply-startup-layout (or force t))
     (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
 
 (provide 'worktrees-layout)

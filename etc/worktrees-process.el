@@ -18,8 +18,9 @@
 
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
 (declare-function vibemacs-worktrees--files-refresh "worktrees-codex")
-(declare-function vibemacs-worktrees-center-show-chat "worktrees-chat")
-(declare-function vibemacs-worktrees-center-show-terminal "worktrees-chat")
+(declare-function vibemacs-worktrees--activate-workspace-layout "worktrees-layout")
+(declare-function vibemacs-worktrees-center-show-chat "worktrees-layout")
+(declare-function vibemacs-worktrees-center-show-terminal "worktrees-layout")
 
 ;;; Terminal Functions
 
@@ -321,16 +322,14 @@ ON-FAILURE is called with error message if any command fails."
                      :base base
                      :created (vibemacs-worktrees--timestamp)))
              (metadata (vibemacs-worktrees--default-metadata entry)))
-        (vibemacs-worktrees--register entry)
-        (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
-        (vibemacs-worktrees--save-metadata entry metadata)
-        ;; Activate UI immediately so user is switched to the new worktree
-        (let ((center-window (and (window-live-p vibemacs-worktrees--center-window)
-                                  vibemacs-worktrees--center-window)))
-          (vibemacs-worktrees-dashboard--activate entry)
-          (vibemacs-worktrees--files-refresh entry nil)
-          (vibemacs-worktrees-center-show-chat entry)
-          (if (and center-window (window-live-p center-window))
+        (prog1 entry
+          (vibemacs-worktrees--register entry)
+          (setf (alist-get 'assistant metadata nil nil #'eq) assistant)
+          (vibemacs-worktrees--save-metadata entry metadata)
+          ;; Activate the full workspace layout so the new worktree opens
+          ;; with the standard dashboard + chat panes.
+          (vibemacs-worktrees--activate-workspace-layout entry)
+          (if (window-live-p vibemacs-worktrees--center-window)
               (progn
                 (when vibemacs-worktrees-open-terminal-on-create
                   (let ((original-window (selected-window)))
@@ -338,26 +337,28 @@ ON-FAILURE is called with error message if any command fails."
                     (vibemacs-worktrees-center-show-chat entry)
                     (when (window-live-p original-window)
                       (select-window original-window))))
-                (when (window-live-p vibemacs-worktrees--center-window)
-                  (select-window vibemacs-worktrees--center-window)))
+                (select-window vibemacs-worktrees--center-window))
+            ;; Layout could not create the center pane (tiny frames); fall back
+            ;; to a plain terminal or dired view so the user still lands in the new worktree.
             (when vibemacs-worktrees-open-terminal-on-create
               (vibemacs-worktrees-open-terminal entry))
             (when (file-directory-p target-path)
-              (dired target-path))))
-        ;; Show initial message
-        (message "Worktree %s created, running setup..." name)
-        ;; Define callbacks for setup completion
-        (let ((complete-setup
-               (lambda ()
-                 (message "Worktree %s ready at %s" name target-path)))
-              (handle-failure
-               (lambda (error-msg)
-                 (message "Worktree setup failed for %s: %s" name error-msg)
-                 (message "Worktree created at %s but setup incomplete" target-path))))
-          ;; Run setup commands from .vibemacs/worktrees.json
-          ;; "Ready" message only shows after all commands complete successfully
-          (vibemacs-worktrees--run-setup-commands repo target-path name complete-setup handle-failure))
-        entry))))
+              (dired target-path)))
+          ;; Show initial message
+          (message "Worktree %s created, running setup..." name)
+          ;; Define callbacks for setup completion
+          (let ((complete-setup
+                 (lambda ()
+                   (message "Worktree %s ready at %s" name target-path)))
+                (handle-failure
+                 (lambda (error-msg)
+                   (message "Worktree setup failed for %s: %s" name error-msg)
+                   (message "Worktree created at %s but setup incomplete" target-path))))
+            ;; Run setup commands from .vibemacs/worktrees.json
+            ;; "Ready" message only shows after all commands complete successfully
+            (vibemacs-worktrees--run-setup-commands
+             repo target-path name complete-setup handle-failure))))))
+)
 
 ;;;###autoload
 (defun vibemacs-worktrees-archive (entry)
