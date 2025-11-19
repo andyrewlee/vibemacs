@@ -313,7 +313,7 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
     (set-window-parameter root 'window-size-fixed nil)
     (set-window-parameter root 'no-delete-other-windows nil)
     (set-window-parameter root 'window-preserved-size nil)
-    (if (< frame-width (+ usable-left min-center))
+    (if (< frame-width (max (+ usable-left min-center) (+ 12 min-center)))
         ;; Too narrow: just show welcome buffer full width
         (progn
           (set-window-buffer root welcome-buffer)
