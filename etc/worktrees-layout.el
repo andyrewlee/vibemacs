@@ -244,9 +244,60 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
 
 ;;; Startup Layout
 
+
+(defun vibemacs-worktrees--apply-startup-layout (&optional force)
+  "Arrange the initial dashboard + welcome layout.
+When FORCE is non-nil, rebuild the layout even if it already ran."
+  (when (and vibemacs-worktrees-startup-layout
+             (or force (not vibemacs-worktrees--startup-applied)))
+    (let ((frame (selected-frame)))
+      (when (and vibemacs-worktrees-startup-frame-size
+                 (display-graphic-p frame))
+        (let ((cols (car vibemacs-worktrees-startup-frame-size))
+              (rows (cdr vibemacs-worktrees-startup-frame-size)))
+          (when (and (integerp cols) (integerp rows))
+            (set-frame-size frame cols rows)))))
+    (let ((ignore-window-parameters t))
+      (delete-other-windows))
+    (let* ((root-window (selected-window))
+           (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
+           (welcome-buffer (vibemacs-worktrees-welcome))
+           (desired-left (or vibemacs-worktrees-startup-left-width 24)))
+      (condition-case _err
+          (let ((left-window (split-window root-window desired-left 'left)))
+            (when left-window
+              (window-resize left-window (- desired-left (window-total-width left-window)) t)
+              (set-window-buffer left-window dashboard-buffer)
+              (set-window-dedicated-p left-window t)
+              (set-window-parameter left-window 'window-size-fixed 'width)
+              (set-window-parameter left-window 'no-delete-other-windows t)
+              (set-window-parameter left-window 'window-preserved-size (cons 'width desired-left)))
+            (set-window-buffer root-window welcome-buffer)
+            (setq vibemacs-worktrees--center-window root-window)
+            (setq vibemacs-worktrees--right-window nil)
+            (setq vibemacs-worktrees--terminal-window nil))
+        (error
+         (set-window-buffer root-window dashboard-buffer)
+         (set-window-dedicated-p root-window t)
+         (setq vibemacs-worktrees--center-window root-window)
+         (setq vibemacs-worktrees--right-window nil)
+         (setq vibemacs-worktrees--terminal-window nil)))
+      (setq vibemacs-worktrees--startup-applied t))))
+;;;###autoload
+(defun vibemacs-worktrees-launch-home (&optional force)
+  "Launch the vibemacs dashboard layout.
+With FORCE (interactive prefix), rebuild the layout even if it was already applied."
+  (interactive "P")
+  (when force
+    (setq vibemacs-worktrees--startup-applied nil))
+  (if vibemacs-worktrees-startup-layout
+      (vibemacs-worktrees--apply-startup-layout force)
+    (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
+
+(provide 'worktrees-layout)
+;;; worktrees-layout.el ends here
 (defun vibemacs-worktrees--activate-workspace-layout (entry)
   "Switch to the 3-pane workspace layout and activate ENTRY."
-  ;; 1. Force Clean Slate (Fix for 'window too small' errors)
   (switch-to-buffer (get-buffer-create "*scratch*"))
   (let ((ignore-window-parameters t))
     (delete-other-windows))
@@ -256,7 +307,6 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
     (set-window-parameter win 'no-delete-other-windows nil)
     (set-window-parameter win 'window-preserved-size nil))
 
-  ;; 2. Apply Layout (Exact copy of previous working logic)
   (let* ((root-window (selected-window))
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
          (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
@@ -266,9 +316,7 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
          (min-center 60)
          (min-two-column (+ min-left min-center))
          (min-three-column (+ min-left min-center min-right)))
-    
     (cond
-     ;; Three-column layout
      ((>= frame-width min-three-column)
       (let* ((available-for-sides (- frame-width min-center))
              (max-left (floor (* available-for-sides 0.5)))
@@ -292,12 +340,10 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
              (terminal-window nil))
         (when can-split-right
           (setq status-window (split-window chat-window (- left-width) 'right))
-          ;; Split dashboard-window (git status) horizontally to add terminal at bottom
           (when dashboard-window
             (setq git-status-window (split-window dashboard-window nil 'above))
             (setq terminal-window dashboard-window)))
         (let ((entry (or entry (car (vibemacs-worktrees--entries-safe)))))
-          ;; dashboard buffer (currently rendered in chat-window/middle pane)
           (set-window-buffer chat-window dashboard-buffer)
           (let ((delta (- left-width (window-total-width chat-window))))
             (when (/= delta 0)
@@ -313,7 +359,6 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
               (set-window-parameter status-win 'window-size-fixed 'width)
               (set-window-parameter status-win 'no-delete-other-windows t)
               (set-window-parameter status-win 'window-preserved-size (cons 'width right-width)))
-            ;; Set up terminal in bottom window
             (when terminal-window
               (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
                 (set-window-buffer terminal-window terminal-buffer)
@@ -340,11 +385,9 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
             (when dashboard-window
               (vibemacs-worktrees-git-status--populate entry)
               (vibemacs-worktrees-git-status--start-auto-refresh)))
-          (setq applied t)
-          ;; chat pane lives in status-window; git status/terminal stacked to its left
+          (setq vibemacs-worktrees--startup-applied t)
           (when status-window
-            (select-window status-window))))))
-     ;; Two-column layout
+            (select-window status-window)))))
      ((>= frame-width min-two-column)
       (let* ((max-left (max min-left (- frame-width min-center)))
              (auto-width (max min-left (min max-left (floor (* frame-width 0.20)))))
@@ -376,78 +419,13 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
              (message "vibemacs: unable to open chat console (%s)"
                       (error-message-string err))))
           (vibemacs-worktrees--files-refresh entry nil))
-        (setq applied t)
+        (setq vibemacs-worktrees--startup-applied t)
         (select-window center-window)
         (message "vibemacs: frame width %d < %d; showing two-column layout." frame-width min-three-column)))
-     ;; One-column layout
      (t
       (setq vibemacs-worktrees--center-window nil)
       (setq vibemacs-worktrees--right-window nil)
       (set-window-buffer root-window dashboard-buffer)
       (set-window-dedicated-p root-window t)
-      (setq applied t)
-      (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))
-    (setq vibemacs-worktrees--startup-applied applied)))
-
-(defun vibemacs-worktrees--apply-startup-layout (&optional force)
-  "Arrange the initial 2-pane dashboard layout (Left: Dashboard, Right: Welcome).
-When FORCE is non-nil, rebuild the layout even if it already ran."
-  (when (and vibemacs-worktrees-startup-layout
-             (or force (not vibemacs-worktrees--startup-applied)))
-    (let ((frame (selected-frame)))
-      (when (and vibemacs-worktrees-startup-frame-size
-                 (display-graphic-p frame))
-        (let ((cols (car vibemacs-worktrees-startup-frame-size))
-              (rows (cdr vibemacs-worktrees-startup-frame-size)))
-          (when (and (integerp cols) (integerp rows))
-            (set-frame-size frame cols rows))))
-      
-      (delete-other-windows)
-      
-      (let* ((root-window (selected-window))
-             (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
-             (welcome-buffer (vibemacs-worktrees-welcome))
-             (desired-left (or vibemacs-worktrees-startup-left-width 24)))
-        
-        ;; Split into Left (Dashboard) and Right (Welcome)
-        ;; The split-window function splits the *root-window*, returning the *new* window.
-        ;; 'left means the new window is created to the left.
-        ;; The size argument to split-window is the size of the NEW window.
-        (let ((left-window (split-window root-window desired-left 'left)))
-          
-          ;; Adjust sizes to ensure left window is strictly 'desired-left'
-          ;; and the rest is for the root (now right) window.
-          (window-resize left-window (- desired-left (window-total-width left-window)) t)
-          
-          (set-window-buffer left-window dashboard-buffer)
-          (set-window-dedicated-p left-window t)
-          (set-window-parameter left-window 'window-size-fixed nil) ;; Allow resizing initially to set size
-          (set-window-parameter left-window 'no-delete-other-windows t)
-          
-          ;; Force fixed width after sizing
-          (set-window-parameter left-window 'window-size-fixed 'width)
-          
-          ;; The remaining window is the "center" one, initially showing welcome
-          (set-window-buffer root-window welcome-buffer)
-          
-          ;; Reset global window tracking
-          (setq vibemacs-worktrees--center-window root-window)
-          (setq vibemacs-worktrees--right-window nil)
-          (setq vibemacs-worktrees--terminal-window nil)
-          
-          ;; Mark as applied
-          (setq vibemacs-worktrees--startup-applied t))))))
-
-;;;###autoload
-(defun vibemacs-worktrees-launch-home (&optional force)
-  "Launch the vibemacs dashboard layout.
-With FORCE (interactive prefix), rebuild the layout even if it was already applied."
-  (interactive "P")
-  (when force
-    (setq vibemacs-worktrees--startup-applied nil))
-  (if vibemacs-worktrees-startup-layout
-      (vibemacs-worktrees--apply-startup-layout force)
-    (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
-
-(provide 'worktrees-layout)
-;;; worktrees-layout.el ends here
+      (setq vibemacs-worktrees--startup-applied t)
+      (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))))
