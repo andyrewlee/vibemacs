@@ -15,6 +15,7 @@
 
 (declare-function vibemacs-worktrees-dashboard--setup-buffer "worktrees-dashboard")
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
+(declare-function vibemacs-worktrees-welcome "worktrees-dashboard")
 (declare-function vibemacs-worktrees-git-status--setup-buffer "worktrees-git-status")
 (declare-function vibemacs-worktrees-git-status--populate "worktrees-git-status")
 (declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-git-status")
@@ -243,158 +244,199 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
 
 ;;; Startup Layout
 
+(defun vibemacs-worktrees--activate-workspace-layout (entry)
+  "Switch to the 3-pane workspace layout and activate ENTRY."
+  ;; 1. Force Clean Slate (Fix for 'window too small' errors)
+  (switch-to-buffer (get-buffer-create "*scratch*"))
+  (let ((ignore-window-parameters t))
+    (delete-other-windows))
+  (let ((win (selected-window)))
+    (set-window-dedicated-p win nil)
+    (set-window-parameter win 'window-size-fixed nil)
+    (set-window-parameter win 'no-delete-other-windows nil)
+    (set-window-parameter win 'window-preserved-size nil))
+
+  ;; 2. Apply Layout (Exact copy of previous working logic)
+  (let* ((root-window (selected-window))
+         (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
+         (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
+         (frame-width (window-total-width root-window))
+         (min-left 20)
+         (min-right 20)
+         (min-center 60)
+         (min-two-column (+ min-left min-center))
+         (min-three-column (+ min-left min-center min-right)))
+    
+    (cond
+     ;; Three-column layout
+     ((>= frame-width min-three-column)
+      (let* ((available-for-sides (- frame-width min-center))
+             (max-left (floor (* available-for-sides 0.5)))
+             (auto-left (max min-left (min max-left (floor (* frame-width 0.15)))))
+             (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
+             (left-width (max min-left (min max-left desired-left)))
+             (auto-right (max min-left (min max-left (floor (* frame-width 0.15)))))
+             (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
+             (right-width (max min-left (min max-left desired-right)))
+             (new-left (split-window root-window right-width 'left))
+             (dashboard-window (if (< (window-total-width new-left) (window-total-width root-window))
+                                   new-left
+                                 root-window))
+             (chat-window (if (< (window-total-width new-left) (window-total-width root-window))
+                              root-window
+                            new-left))
+             (actual-center-width (window-total-width chat-window))
+             (can-split-right (>= actual-center-width (+ min-center min-right)))
+             (status-window nil)
+             (git-status-window nil)
+             (terminal-window nil))
+        (when can-split-right
+          (setq status-window (split-window chat-window (- left-width) 'right))
+          ;; Split dashboard-window (git status) horizontally to add terminal at bottom
+          (when dashboard-window
+            (setq git-status-window (split-window dashboard-window nil 'above))
+            (setq terminal-window dashboard-window)))
+        (let ((entry (or entry (car (vibemacs-worktrees--entries-safe)))))
+          ;; dashboard buffer (currently rendered in chat-window/middle pane)
+          (set-window-buffer chat-window dashboard-buffer)
+          (let ((delta (- left-width (window-total-width chat-window))))
+            (when (/= delta 0)
+              (window-resize chat-window delta t)))
+          (set-window-dedicated-p chat-window t)
+          (set-window-parameter chat-window 'window-size-fixed 'width)
+          (set-window-parameter chat-window 'no-delete-other-windows t)
+          (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
+          (when status-window
+            (let ((status-win (or git-status-window dashboard-window)))
+              (set-window-buffer status-win git-status-buffer)
+              (set-window-dedicated-p status-win t)
+              (set-window-parameter status-win 'window-size-fixed 'width)
+              (set-window-parameter status-win 'no-delete-other-windows t)
+              (set-window-parameter status-win 'window-preserved-size (cons 'width right-width)))
+            ;; Set up terminal in bottom window
+            (when terminal-window
+              (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
+                (set-window-buffer terminal-window terminal-buffer)
+                (set-window-parameter terminal-window 'window-size-fixed 'width)
+                (set-window-parameter terminal-window 'no-delete-other-windows t))))
+          (setq vibemacs-worktrees--center-window status-window)
+          (setq vibemacs-worktrees--right-window (or git-status-window dashboard-window))
+          (setq vibemacs-worktrees--terminal-window terminal-window)
+          (when entry
+            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
+            (vibemacs-worktrees-dashboard--activate entry)
+            (with-selected-window chat-window
+              (goto-char (point-min))
+              (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
+              (when (bound-and-true-p hl-line-mode)
+                (hl-line-highlight)))
+            (select-window status-window)
+            (condition-case err
+                (vibemacs-worktrees-center-show-chat entry)
+              (error
+               (message "vibemacs: unable to open chat console (%s)"
+                        (error-message-string err))))
+            (vibemacs-worktrees--files-refresh entry nil)
+            (when dashboard-window
+              (vibemacs-worktrees-git-status--populate entry)
+              (vibemacs-worktrees-git-status--start-auto-refresh)))
+          (setq applied t)
+          ;; chat pane lives in status-window; git status/terminal stacked to its left
+          (when status-window
+            (select-window status-window))))))
+     ;; Two-column layout
+     ((>= frame-width min-two-column)
+      (let* ((max-left (max min-left (- frame-width min-center)))
+             (auto-width (max min-left (min max-left (floor (* frame-width 0.20)))))
+             (desired (or vibemacs-worktrees-startup-left-width auto-width))
+             (left-width (max min-left (min max-left desired)))
+             (left-window (split-window root-window left-width 'left))
+             (center-window root-window)
+             (entries (vibemacs-worktrees--entries-safe))
+             (entry (or entry (car entries))))
+        (set-window-buffer left-window dashboard-buffer)
+        (set-window-dedicated-p left-window t)
+        (set-window-parameter left-window 'window-size-fixed 'width)
+        (set-window-parameter left-window 'no-delete-other-windows t)
+        (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
+        (setq vibemacs-worktrees--center-window center-window)
+        (setq vibemacs-worktrees--right-window nil)
+        (when entry
+          (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
+          (vibemacs-worktrees-dashboard--activate entry)
+          (with-selected-window left-window
+            (goto-char (point-min))
+            (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
+            (when (bound-and-true-p hl-line-mode)
+              (hl-line-highlight)))
+          (select-window center-window)
+          (condition-case err
+              (vibemacs-worktrees-center-show-chat entry)
+            (error
+             (message "vibemacs: unable to open chat console (%s)"
+                      (error-message-string err))))
+          (vibemacs-worktrees--files-refresh entry nil))
+        (setq applied t)
+        (select-window center-window)
+        (message "vibemacs: frame width %d < %d; showing two-column layout." frame-width min-three-column)))
+     ;; One-column layout
+     (t
+      (setq vibemacs-worktrees--center-window nil)
+      (setq vibemacs-worktrees--right-window nil)
+      (set-window-buffer root-window dashboard-buffer)
+      (set-window-dedicated-p root-window t)
+      (setq applied t)
+      (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))
+    (setq vibemacs-worktrees--startup-applied applied)))
+
 (defun vibemacs-worktrees--apply-startup-layout (&optional force)
-  "Arrange the vibemacs dashboard + chat layout.
+  "Arrange the initial 2-pane dashboard layout (Left: Dashboard, Right: Welcome).
 When FORCE is non-nil, rebuild the layout even if it already ran."
   (when (and vibemacs-worktrees-startup-layout
              (or force (not vibemacs-worktrees--startup-applied)))
-    (let ((frame (selected-frame))
-          (applied nil))
+    (let ((frame (selected-frame)))
       (when (and vibemacs-worktrees-startup-frame-size
                  (display-graphic-p frame))
         (let ((cols (car vibemacs-worktrees-startup-frame-size))
               (rows (cdr vibemacs-worktrees-startup-frame-size)))
           (when (and (integerp cols) (integerp rows))
             (set-frame-size frame cols rows))))
+      
       (delete-other-windows)
+      
       (let* ((root-window (selected-window))
              (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
-             (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
-             (frame-width (window-total-width root-window))
-             (min-left 20)
-             (min-right 20)
-             (min-center 60)
-             (min-two-column (+ min-left min-center))
-             (min-three-column (+ min-left min-center min-right)))
-        (cond
-         ;; Three-column layout
-         ((>= frame-width min-three-column)
-          (let* ((available-for-sides (- frame-width min-center))
-                 (max-left (floor (* available-for-sides 0.5)))
-                 (auto-left (max min-left (min max-left (floor (* frame-width 0.15)))))
-                 (desired-left (or vibemacs-worktrees-startup-left-width auto-left))
-                 (left-width (max min-left (min max-left desired-left)))
-                 (auto-right (max min-left (min max-left (floor (* frame-width 0.15)))))
-                 (desired-right (or vibemacs-worktrees-startup-right-width auto-right))
-                 (right-width (max min-left (min max-left desired-right)))
-                 (new-left (split-window root-window right-width 'left))
-                 (dashboard-window (if (< (window-total-width new-left) (window-total-width root-window))
-                                       new-left
-                                     root-window))
-                 (chat-window (if (< (window-total-width new-left) (window-total-width root-window))
-                                  root-window
-                                new-left))
-                 (actual-center-width (window-total-width chat-window))
-                 (can-split-right (>= actual-center-width (+ min-center min-right)))
-                 (status-window nil)
-                 (git-status-window nil)
-                 (terminal-window nil))
-            (when can-split-right
-              (setq status-window (split-window chat-window (- left-width) 'right))
-              ;; Split dashboard-window (git status) horizontally to add terminal at bottom
-              (when dashboard-window
-                (setq git-status-window (split-window dashboard-window nil 'above))
-                (setq terminal-window dashboard-window)))
-            (let ((entries (vibemacs-worktrees--entries-safe)))
-              (let ((entry (or (cl-find vibemacs-worktrees--active-root entries
-                                        :key #'vibemacs-worktrees--entry-root
-                                        :test #'string=)
-                               (car entries))))
-                ;; dashboard buffer (currently rendered in chat-window/middle pane)
-                (set-window-buffer chat-window dashboard-buffer)
-                (let ((delta (- left-width (window-total-width chat-window))))
-                  (when (/= delta 0)
-                    (window-resize chat-window delta t)))
-                (set-window-dedicated-p chat-window t)
-                (set-window-parameter chat-window 'window-size-fixed 'width)
-                (set-window-parameter chat-window 'no-delete-other-windows t)
-                (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
-                (when status-window
-                  (let ((status-win (or git-status-window dashboard-window)))
-                    (set-window-buffer status-win git-status-buffer)
-                    (set-window-dedicated-p status-win t)
-                    (set-window-parameter status-win 'window-size-fixed 'width)
-                    (set-window-parameter status-win 'no-delete-other-windows t)
-                    (set-window-parameter status-win 'window-preserved-size (cons 'width right-width)))
-                  ;; Set up terminal in bottom window
-                  (when terminal-window
-                    (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
-                      (set-window-buffer terminal-window terminal-buffer)
-                      (set-window-parameter terminal-window 'window-size-fixed 'width)
-                      (set-window-parameter terminal-window 'no-delete-other-windows t))))
-                (setq vibemacs-worktrees--center-window status-window)
-                (setq vibemacs-worktrees--right-window (or git-status-window dashboard-window))
-                (setq vibemacs-worktrees--terminal-window terminal-window)
-                (when entry
-                  (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
-                  (vibemacs-worktrees-dashboard--activate entry)
-                  (with-selected-window chat-window
-                    (goto-char (point-min))
-                    (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
-                    (when (bound-and-true-p hl-line-mode)
-                      (hl-line-highlight)))
-                  (select-window status-window)
-                  (condition-case err
-                      (vibemacs-worktrees-center-show-chat entry)
-                    (error
-                     (message "vibemacs: unable to open chat console (%s)"
-                              (error-message-string err))))
-                  (vibemacs-worktrees--files-refresh entry nil)
-                  (when dashboard-window
-                    (vibemacs-worktrees-git-status--populate entry)
-                    (vibemacs-worktrees-git-status--start-auto-refresh)))
-                (setq applied t)
-                ;; chat pane lives in status-window; git status/terminal stacked to its left
-                (when status-window
-                  (select-window status-window))))))
-         ;; Two-column layout
-         ((>= frame-width min-two-column)
-          (let* ((max-left (max min-left (- frame-width min-center)))
-                 (auto-width (max min-left (min max-left (floor (* frame-width 0.20)))))
-                 (desired (or vibemacs-worktrees-startup-left-width auto-width))
-                 (left-width (max min-left (min max-left desired)))
-                 (left-window (split-window root-window left-width 'left))
-                 (center-window root-window)
-                 (entries (vibemacs-worktrees--entries-safe))
-                 (entry (or (cl-find vibemacs-worktrees--active-root entries
-                                     :key #'vibemacs-worktrees--entry-root
-                                     :test #'string=)
-                            (car entries))))
-            (set-window-buffer left-window dashboard-buffer)
-            (set-window-dedicated-p left-window t)
-            (set-window-parameter left-window 'window-size-fixed 'width)
-            (set-window-parameter left-window 'no-delete-other-windows t)
-            (set-window-parameter left-window 'window-preserved-size (cons 'width left-width))
-            (setq vibemacs-worktrees--center-window center-window)
-            (setq vibemacs-worktrees--right-window nil)
-            (when entry
-              (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
-              (vibemacs-worktrees-dashboard--activate entry)
-              (with-selected-window left-window
-                (goto-char (point-min))
-                (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
-                (when (bound-and-true-p hl-line-mode)
-                  (hl-line-highlight)))
-              (select-window center-window)
-              (condition-case err
-                  (vibemacs-worktrees-center-show-chat entry)
-                (error
-                 (message "vibemacs: unable to open chat console (%s)"
-                          (error-message-string err))))
-              (vibemacs-worktrees--files-refresh entry nil))
-            (setq applied t)
-            (select-window center-window)
-            (message "vibemacs: frame width %d < %d; showing two-column layout." frame-width min-three-column)))
-         ;; One-column layout
-         (t
-          (setq vibemacs-worktrees--center-window nil)
+             (welcome-buffer (vibemacs-worktrees-welcome))
+             (desired-left (or vibemacs-worktrees-startup-left-width 24)))
+        
+        ;; Split into Left (Dashboard) and Right (Welcome)
+        ;; The split-window function splits the *root-window*, returning the *new* window.
+        ;; 'left means the new window is created to the left.
+        ;; The size argument to split-window is the size of the NEW window.
+        (let ((left-window (split-window root-window desired-left 'left)))
+          
+          ;; Adjust sizes to ensure left window is strictly 'desired-left'
+          ;; and the rest is for the root (now right) window.
+          (window-resize left-window (- desired-left (window-total-width left-window)) t)
+          
+          (set-window-buffer left-window dashboard-buffer)
+          (set-window-dedicated-p left-window t)
+          (set-window-parameter left-window 'window-size-fixed nil) ;; Allow resizing initially to set size
+          (set-window-parameter left-window 'no-delete-other-windows t)
+          
+          ;; Force fixed width after sizing
+          (set-window-parameter left-window 'window-size-fixed 'width)
+          
+          ;; The remaining window is the "center" one, initially showing welcome
+          (set-window-buffer root-window welcome-buffer)
+          
+          ;; Reset global window tracking
+          (setq vibemacs-worktrees--center-window root-window)
           (setq vibemacs-worktrees--right-window nil)
-          (set-window-buffer root-window dashboard-buffer)
-          (set-window-dedicated-p root-window t)
-          (setq applied t)
-          (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))
-        (setq vibemacs-worktrees--startup-applied applied)
-        applied))))
+          (setq vibemacs-worktrees--terminal-window nil)
+          
+          ;; Mark as applied
+          (setq vibemacs-worktrees--startup-applied t))))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-launch-home (&optional force)

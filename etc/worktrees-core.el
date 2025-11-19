@@ -33,8 +33,8 @@
   :group 'vibemacs-worktrees)
 
 (defcustom vibemacs-worktrees-registry
-  (expand-file-name "worktrees.json" vibemacs-worktrees--default-home)
-  "File storing metadata about active vibemacs worktrees."
+  (expand-file-name "projects.json" vibemacs-worktrees--default-home)
+  "File storing the list of registered project paths."
   :type 'file
   :group 'vibemacs-worktrees)
 
@@ -227,6 +227,10 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 (cl-defstruct (vibemacs-worktrees--entry (:constructor vibemacs-worktrees--entry-create))
   "Structure representing a worktree entry."
   name branch repo root base created)
+
+(cl-defstruct (vibemacs-project (:constructor vibemacs-project-create))
+  "Structure representing a project (repository)."
+  name path worktrees)
 
 ;;; Utility Functions
 
