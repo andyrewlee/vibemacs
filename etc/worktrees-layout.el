@@ -290,6 +290,14 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
 
 (defun vibemacs-worktrees--apply-home-layout ()
   "Force the minimal Home layout: dashboard on the left, welcome in center."
+  ;; Respect configured initial frame size, same as startup layout.
+  (let ((frame (selected-frame)))
+    (when (and vibemacs-worktrees-startup-frame-size
+               (display-graphic-p frame))
+      (let ((cols (car vibemacs-worktrees-startup-frame-size))
+            (rows (cdr vibemacs-worktrees-startup-frame-size)))
+        (when (and (integerp cols) (integerp rows))
+          (set-frame-size frame cols rows)))))
   (let ((ignore-window-parameters t))
     (delete-other-windows))
   (let* ((root (selected-window))
