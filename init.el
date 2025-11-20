@@ -7,6 +7,13 @@
 
 ;;; Code:
 
+;; Prefer newer source over compiled bytecode during development.
+;; Load jka-compr first to avoid a known recursive-load bug when .el.gz
+;; files are on `load-path` and `load-prefer-newer` is non-nil.
+(let ((load-prefer-newer nil))
+  (require 'jka-compr))
+(setq load-prefer-newer t)
+
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
