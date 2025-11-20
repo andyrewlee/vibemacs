@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is **vibemacs** - an Emacs configuration optimized for "vibe coders" with a sophisticated worktree management system that integrates AI coding assistants (Codex, Claude, Gemini). The configuration uses Evil mode (Vim keybindings) with a custom SPC-based leader key system.
+This is **vibemacs** - an Emacs configuration optimized for "vibe coders" with a worktree management system and chat-first AI assistants (Claude, Gemini, or any CLI you map in `vibemacs-worktrees-chat-assistants`). Codex-specific plan/apply helpers were removed; chat buffers now simply launch the configured command in vterm. The configuration uses Evil mode (Vim keybindings) with a custom SPC-based leader key system.
 
 ## Core Architecture
 
@@ -13,14 +13,14 @@ This is **vibemacs** - an Emacs configuration optimized for "vibe coders" with a
 The heart of vibemacs is a modular worktree management system split into focused components:
 
 - **worktrees-core.el**: Data structures, faces, customizations, and shared utilities
-- **worktrees-git.el**: Git operations and status tracking
-- **worktrees-registry.el**: Persistent storage in `~/.vibemacs/worktrees.json`
-- **worktrees-metadata.el**: Per-worktree metadata (assistant config, Codex history, custom env vars)
+- **worktrees-git.el**: Git operations (discover worktrees, branch creation/cleanup)
+- **worktrees-registry.el**: Persistent project list in `~/.vibemacs/projects.json`
+- **worktrees-metadata.el**: Per-worktree metadata (assistant config, custom env vars)
 - **worktrees-process.el**: Terminal and script execution (setup/run/archive scripts)
-- **worktrees-codex.el**: Codex CLI integration, diff handling, code review
 - **worktrees-chat.el**: AI assistant chat buffer management via vterm
-- **worktrees-dashboard.el**: Dashboard UI (tabulated-list-mode), git status sidebar
-- **worktrees-layout.el**: Window layout management and pane orchestration
+- **worktrees-dashboard.el**: Dashboard UI (tabulated-list-mode) and dispatcher
+- **worktrees-git-status.el**: Git status sidebar with auto-refresh + sidebar terminal
+- **worktrees-layout.el**: Window layout management and pane orchestration (center tabs for chat/diff/terminal)
 - **worktrees.el**: Entry point that requires all modules in dependency order
 
 ### Key Concepts
@@ -29,7 +29,7 @@ The heart of vibemacs is a modular worktree management system split into focused
 2. **Active Root**: `vibemacs-worktrees--active-root` tracks the currently focused worktree
 3. **Three-Pane Layout**: Dashboard (left) | Chat/Terminal (center) | Git Status (right)
 4. **Assistant Integration**: Configurable AI assistants via vterm with custom interrupt handling
-5. **Metadata Storage**: Per-worktree JSON files in `~/.vibemacs/metadata/<repo-hash>/<worktree-name>/metadata.json`
+5. **Metadata Storage**: Per-worktree JSON files in `~/.vibemacs/worktrees-metadata/<repo-hash>/worktree.json`
 
 ## Development Commands
 
@@ -156,12 +156,14 @@ Dashboard and list views use `tabulated-list-mode`:
 - **Port Allocation**: Each worktree gets a reserved port range (starting at 6200, 10 ports per worktree)
 - **Auto-save**: `delete-trailing-whitespace` runs on every save
 - **Primary Checkout Protection**: Cannot delete a worktree if its root equals the repo path
+- **AI flows**: Codex plan/apply/diff automation is gone; use chat buffers (e.g., `vibemacs-worktrees-create-plan`, `vibemacs-worktrees-research-codebase`) with whichever assistant command is configured.
 
 ## File Locations
 
 - **Main init**: `~/.emacs.d/init.el`
 - **Custom settings**: `~/.emacs.d/custom.el`
 - **Worktree modules**: `~/.emacs.d/etc/worktrees*.el`
-- **Registry**: `~/.vibemacs/worktrees.json` (or `$VIBEMACS_HOME/worktrees.json`)
-- **Metadata**: `~/.vibemacs/metadata/<repo-hash>/<worktree-name>/metadata.json`
+- **Registry**: `~/.vibemacs/projects.json` (or `$VIBEMACS_HOME/projects.json`)
+- **Per-project scripts**: `.vibemacs/worktrees.json` inside a repo controls setup/run/archive commands
+- **Metadata**: `~/.vibemacs/worktrees-metadata/<repo-hash>/worktree.json`
 - **Worktree checkouts**: `~/.vibemacs/worktrees/<repo-name>/<worktree-name>/`

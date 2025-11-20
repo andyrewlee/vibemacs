@@ -1,6 +1,7 @@
 elpa/
 auto-save-list/
 transient/
+tramp
 custom.el
 projects
 libtree-*
