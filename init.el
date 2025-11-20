@@ -35,6 +35,9 @@
   (error
    (message "vibemacs: failed to load worktrees (%s)" (error-message-string err))))
 
+;; Ensure keybound commands autoload even if modules haven’t been loaded yet.
+(autoload 'vibemacs-worktrees-new "worktrees-process" nil t)
+
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")
 
