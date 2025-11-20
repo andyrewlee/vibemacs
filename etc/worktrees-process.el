@@ -23,6 +23,11 @@
 (declare-function vibemacs-worktrees-center-show-chat "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-terminal "worktrees-layout")
 
+(defcustom vibemacs-worktrees-setup-continue-on-error t
+  "Whether to continue executing remaining setup-worktree commands after a failure."
+  :type 'boolean
+  :group 'vibemacs)
+
 ;;; Terminal Functions
 
 (defun vibemacs-worktrees--ensure-vterm ()
@@ -246,7 +251,11 @@ ON-FAILURE is called with error message if any command fails."
                                         expanded-cmd
                                         (buffer-name (process-buffer process)))))
                  (message "[worktrees] ✗ %s" error-msg)
-                 (when on-failure (funcall on-failure error-msg)))))))))))
+                 (when on-failure (funcall on-failure error-msg))
+                 (when vibemacs-worktrees-setup-continue-on-error
+                   (message "[worktrees] Continuing setup despite failure…")
+                   (vibemacs-worktrees--run-setup-command
+                    remaining target-path repo name (1+ index) on-success on-failure))))))))))
 
 (defun vibemacs-worktrees--run-setup-commands (repo target-path name on-success on-failure)
   "Run setup commands from .vibemacs/worktrees.json config.
@@ -372,6 +381,8 @@ ON-FAILURE is called with error message if any command fails."
       (vibemacs-worktrees--call-git repo "branch" "-D" branch))
     (vibemacs-worktrees--unregister root)
     (message "Worktree removed: %s" root)))
+
+)
 
 (provide 'worktrees-process)
 ;;; worktrees-process.el ends here
