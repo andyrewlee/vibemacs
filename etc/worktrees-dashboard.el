@@ -110,9 +110,14 @@
   (setq tabulated-list-format
         [("Name" 18 t)])
   (setq tabulated-list-padding 1)
+  ;; Hide the header line to keep the sidebar uncluttered.
+  (setq tabulated-list-use-header-line nil)
   (setq tabulated-list-sort-key nil)
   (add-hook 'tabulated-list-revert-hook #'vibemacs-worktrees-dashboard--refresh nil t)
   (tabulated-list-init-header)
+  ;; Avoid printing a fake header row (the default when header lines are disabled).
+  (setq-local tabulated-list--header-string nil)
+  (setq header-line-format nil)
   (hl-line-mode 1))
 
 (eval-after-load 'evil
