@@ -13,6 +13,7 @@
 (require 'cl-lib)
 (require 'tabulated-list)
 (require 'transient)
+(eval-when-compile (require 'evil))
 
 (declare-function vibemacs-worktrees-new "worktrees-process")
 (declare-function vibemacs-worktrees-archive "worktrees-process")

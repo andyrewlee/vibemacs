@@ -8,6 +8,8 @@
 
 (require 'worktrees-core)
 (require 'worktrees-codex)
+(require 'filenotify)
+(eval-when-compile (require 'evil))
 
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 (defvar vibemacs-worktrees--center-window)

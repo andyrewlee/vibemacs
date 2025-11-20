@@ -9,6 +9,9 @@
 (require 'worktrees-git)
 (require 'worktrees-registry)
 (require 'worktrees-metadata)
+(require 'ansi-color)
+(require 'diff-mode)
+(eval-when-compile (require 'diff-mode))
 (require 'cl-lib)
 (require 'json)
 (require 'diff-mode)
@@ -19,6 +22,7 @@
 (defvar magit-display-buffer-function)
 (declare-function diff-beginning-of-hunk "diff-mode")
 (declare-function diff-end-of-hunk "diff-mode")
+(declare-function diff-reject-hunk "diff-mode")
 
 (declare-function vibemacs-worktrees--log-buffer "worktrees-process")
 
