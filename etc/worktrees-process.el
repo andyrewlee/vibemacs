@@ -9,6 +9,7 @@
 (require 'worktrees-git)
 (require 'worktrees-registry)
 (require 'worktrees-metadata)
+(require 'worktrees-layout)
 (require 'cl-lib)
 
 (declare-function vterm "vterm")
@@ -357,8 +358,7 @@ ON-FAILURE is called with error message if any command fails."
             ;; Run setup commands from .vibemacs/worktrees.json
             ;; "Ready" message only shows after all commands complete successfully
             (vibemacs-worktrees--run-setup-commands
-             repo target-path name complete-setup handle-failure))))))
-)
+             repo target-path name complete-setup handle-failure)))))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-archive (entry)

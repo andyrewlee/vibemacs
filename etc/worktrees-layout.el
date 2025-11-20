@@ -354,8 +354,7 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
       (vibemacs-worktrees--apply-home-layout)
     (message "vibemacs startup layout is disabled (see `vibemacs-worktrees-startup-layout').")))
 
-(provide 'worktrees-layout)
-;;; worktrees-layout.el ends here
+;;;###autoload
 (defun vibemacs-worktrees--activate-workspace-layout (entry)
   "Switch to the 3-pane workspace layout and activate ENTRY."
   (switch-to-buffer (get-buffer-create "*scratch*"))
@@ -409,10 +408,10 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
             (when (/= delta 0)
               (window-resize chat-window delta t)))
           (set-window-dedicated-p chat-window t)
-         (set-window-parameter chat-window 'window-size-fixed 'width)
-         (set-window-parameter chat-window 'no-delete-other-windows t)
-         (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
-         (setq vibemacs-worktrees--dashboard-window dashboard-window)
+          (set-window-parameter chat-window 'window-size-fixed 'width)
+          (set-window-parameter chat-window 'no-delete-other-windows t)
+          (set-window-parameter chat-window 'window-preserved-size (cons 'width left-width))
+          (setq vibemacs-worktrees--dashboard-window dashboard-window)
           (when status-window
             (let ((status-win (or git-status-window dashboard-window)))
               (set-window-buffer status-win git-status-buffer)
@@ -490,3 +489,6 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
       (set-window-dedicated-p root-window t)
       (setq vibemacs-worktrees--startup-applied t)
       (message "vibemacs: frame width %d < %d; showing dashboard only." frame-width min-two-column)))))
+
+(provide 'worktrees-layout)
+;;; worktrees-layout.el ends here
