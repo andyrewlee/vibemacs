@@ -12,48 +12,10 @@
 (require 'json)
 (require 'subr-x)
 
-(defconst vibemacs-worktrees--legacy-registry
-  (expand-file-name "worktrees.json" vibemacs-worktrees--default-home)
-  "Path to the legacy single-file worktree registry.")
-
-(defun vibemacs-worktrees--maybe-migrate-registry ()
-  "Populate the project registry from the legacy worktrees file when needed."
-  (when (and (not (file-exists-p vibemacs-worktrees-registry))
-             (file-readable-p vibemacs-worktrees--legacy-registry))
-    (condition-case err
-        (let* ((json-object-type 'alist)
-               (json-array-type 'list)
-               (json-key-type 'symbol)
-               (raw (json-read-file vibemacs-worktrees--legacy-registry))
-               (records (cond
-                         ((null raw) nil)
-                         ((and (listp raw) (listp (car raw))) raw)
-                         ((listp raw) (list raw))
-                         ((vectorp raw) (append raw nil))
-                         (t nil)))
-               (paths (delete-dups
-                       (delq nil
-                             (mapcar (lambda (record)
-                                       (let* ((repo (alist-get 'repo record))
-                                              (root (alist-get 'root record))
-                                              (target (or repo root)))
-                                         (when target
-                                           (directory-file-name (expand-file-name target)))))
-                                     records)))))
-          (when paths
-            (vibemacs-worktrees--save-registry paths)
-            (message "vibemacs: migrated %d project%s from legacy worktrees.json"
-                     (length paths)
-                     (if (= (length paths) 1) "" "s"))))
-      (error
-       (message "vibemacs: failed to migrate legacy registry (%s)"
-                (error-message-string err))))))
-
 ;;; Registry Loading and Saving
 
 (defun vibemacs-worktrees--load-registry ()
   "Return list of project paths from the registry file."
-  (vibemacs-worktrees--maybe-migrate-registry)
   (when (file-readable-p vibemacs-worktrees-registry)
     (condition-case err
         (let* ((json-array-type 'list)
