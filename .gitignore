@@ -10,3 +10,4 @@ places
 worktrees.json
 worktrees-metadata/
 eln-cache/
+*.elc

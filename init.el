@@ -10,6 +10,15 @@
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
+;; Must be set before Evil/Evil-collection load to avoid warnings.
+(setq evil-want-keybinding nil)
+;; Start frames at a sane size so the home layout has room on launch.
+(setq frame-resize-pixelwise t)
+(add-to-list 'default-frame-alist '(width . 196))
+(add-to-list 'default-frame-alist '(height . 58))
+;; Respect widths even for the very first frame; carry height too.
+(add-to-list 'initial-frame-alist '(width . 196))
+(add-to-list 'initial-frame-alist '(height . 58))
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
@@ -27,6 +36,18 @@
       (add-hook 'emacs-startup-hook #'vibemacs-worktrees-launch-home))
   (error
    (message "vibemacs: failed to load worktrees (%s)" (error-message-string err))))
+
+;; Ensure keybound commands always resolve, even if autoloads are stale.
+(unless (fboundp 'vibemacs-worktrees-new)
+  (defun vibemacs-worktrees-new ()
+    "Load worktree helpers and create a new worktree."
+    (interactive)
+    (let ((oldfun (symbol-function 'vibemacs-worktrees-new)))
+      (require 'worktrees-process)
+      (let ((newfun (symbol-function 'vibemacs-worktrees-new)))
+        (if (eq newfun oldfun)
+            (user-error "worktrees-process did not update vibemacs-worktrees-new")
+          (call-interactively newfun))))))
 
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")
