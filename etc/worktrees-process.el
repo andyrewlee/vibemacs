@@ -5,6 +5,10 @@
 
 ;;; Code:
 
+(defvar worktrees-process--file (or load-file-name buffer-file-name))
+(when worktrees-process--file
+  (add-to-list 'load-path (file-name-directory worktrees-process--file)))
+
 (require 'worktrees-core)
 (require 'worktrees-git)
 (require 'worktrees-registry)
@@ -201,7 +205,7 @@ ON-FAILURE is called with error message if any command fails."
                  (when vibemacs-worktrees-setup-continue-on-error
                    (message "[worktrees] Continuing setup despite failure…")
                    (vibemacs-worktrees--run-setup-command
-                    remaining target-path repo name (1+ index) on-success on-failure))))))))))
+                    remaining target-path repo name (1+ index) on-success on-failure)))))))))))
 
 (defun vibemacs-worktrees--run-setup-commands (repo target-path name on-success on-failure)
   "Run setup commands from .vibemacs/worktrees.json config.
@@ -330,4 +334,3 @@ ON-FAILURE is called with error message if any command fails."
 
 (provide 'worktrees-process)
 ;;; worktrees-process.el ends here
-)
