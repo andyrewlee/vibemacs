@@ -549,40 +549,39 @@ HELP overrides the default hover tooltip."
 (defun vibemacs-worktrees-dashboard-delete ()
   "Delete the selected worktree and its branch."
   (interactive)
-  (let* ((entry (vibemacs-worktrees-dashboard--current-entry))
-         (root (vibemacs-worktrees--entry-root entry))
-         (repo (vibemacs-worktrees--entry-repo entry))
-         (branch (vibemacs-worktrees--entry-branch entry)))
-    (unless entry
-      (user-error "No worktree selected"))
-    (when (and repo
-               (string=
-                (directory-file-name (expand-file-name root))
-                (directory-file-name (expand-file-name repo))))
-      (user-error "Cannot delete the primary checkout from vibemacs"))
-    (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
-                               (abbreviate-file-name root)
-                               (if (and branch (not (string-empty-p branch))) branch "(none)")))
-      (condition-case err
-          (vibemacs-worktrees--call-git repo "worktree" "remove" "--force" root)
-        (error (message "Failed to remove worktree: %s" (error-message-string err))))
-      (condition-case err
-          (vibemacs-worktrees--call-git repo "worktree" "prune")
-        (error (message "Failed to prune worktrees: %s" (error-message-string err))))
-      (when (and branch (not (string-empty-p branch)))
-        (condition-case err
-            (vibemacs-worktrees--call-git repo "branch" "-D" branch)
-          (error (message "Failed to delete branch %s: %s" branch (error-message-string err)))))
-      (when (file-directory-p root)
-        (ignore-errors (delete-directory root t)))
-      (let ((meta (file-name-directory (vibemacs-worktrees--metadata-path entry))))
-        (when (and meta (file-directory-p meta))
-          (ignore-errors (delete-directory meta t))))
-      (vibemacs-worktrees--unregister root)
-      (remhash root vibemacs-worktrees--transcript-buffers)
-      (let ((next (car (vibemacs-worktrees--entries-safe))))
-        (vibemacs-worktrees-dashboard--activate next))
-      (message "Deleted worktree %s" (vibemacs-worktrees--entry-name entry)))))
+  (if-let ((entry (vibemacs-worktrees-dashboard--current-entry)))
+      (let* ((root (vibemacs-worktrees--entry-root entry))
+             (repo (vibemacs-worktrees--entry-repo entry))
+             (branch (vibemacs-worktrees--entry-branch entry)))
+        (when (and repo
+                   (string=
+                    (directory-file-name (expand-file-name root))
+                    (directory-file-name (expand-file-name repo))))
+          (user-error "Cannot delete the primary checkout from vibemacs"))
+        (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
+                                   (abbreviate-file-name root)
+                                   (if (and branch (not (string-empty-p branch))) branch "(none)")))
+          (condition-case err
+              (vibemacs-worktrees--call-git repo "worktree" "remove" "--force" root)
+            (error (message "Failed to remove worktree: %s" (error-message-string err))))
+          (condition-case err
+              (vibemacs-worktrees--call-git repo "worktree" "prune")
+            (error (message "Failed to prune worktrees: %s" (error-message-string err))))
+          (when (and branch (not (string-empty-p branch)))
+            (condition-case err
+                (vibemacs-worktrees--call-git repo "branch" "-D" branch)
+              (error (message "Failed to delete branch %s: %s" branch (error-message-string err)))))
+          (when (file-directory-p root)
+            (ignore-errors (delete-directory root t)))
+          (let ((meta (file-name-directory (vibemacs-worktrees--metadata-path entry))))
+            (when (and meta (file-directory-p meta))
+              (ignore-errors (delete-directory meta t))))
+          (vibemacs-worktrees--unregister root)
+          (remhash root vibemacs-worktrees--transcript-buffers)
+          (let ((next (car (vibemacs-worktrees--entries-safe))))
+            (vibemacs-worktrees-dashboard--activate next))
+          (message "Deleted worktree %s" (vibemacs-worktrees--entry-name entry))))
+    (message "No worktree selected")))
 
 (defun vibemacs-worktrees-dashboard-codex-plan ()
   "Trigger Codex plan from the dashboard."
