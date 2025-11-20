@@ -182,28 +182,25 @@ If ENTRY is nil prompt the user."
 
 ;;; Worktree Setup Commands
 
-(defun vibemacs-worktrees--read-setup-config (repo)
-  "Read and parse .vibemacs/worktrees.json from REPO.
-Returns the parsed JSON as an alist, or nil if file doesn't exist or is invalid."
-  (let ((config-path (expand-file-name ".vibemacs/worktrees.json" repo)))
-    (message "[worktrees] Looking for config at: %s" config-path)
-    (message "[worktrees] File exists: %s" (file-exists-p config-path))
-    (message "[worktrees] File readable: %s" (file-readable-p config-path))
-    (if (file-readable-p config-path)
-        (condition-case err
-            (with-temp-buffer
-              (insert-file-contents config-path)
-              (message "[worktrees] Config file contents: %s" (buffer-string))
-              (goto-char (point-min))
-              (let ((config (json-parse-buffer :object-type 'alist :array-type 'list)))
-                (message "[worktrees] Parsed config: %S" config)
-                (message "[worktrees] Config type: %s" (type-of config))
-                (message "[worktrees] Config loaded successfully")
-                config))
-          (error
-           (message "[worktrees] Failed to parse %s: %s" config-path (error-message-string err))
-           nil))
-      (message "[worktrees] Config file not found or not readable")
+(defun vibemacs-worktrees--read-setup-config (repo &optional target-path)
+  "Read and parse .vibemacs/worktrees.json, searching REPO then TARGET-PATH.
+Return parsed alist or nil if no readable/valid config is found."
+  (let ((candidates (delete-dups
+                     (delq nil
+                           (list (expand-file-name ".vibemacs/worktrees.json" repo)
+                                 (when target-path
+                                   (expand-file-name ".vibemacs/worktrees.json" target-path)))))))
+    (catch 'found
+      (dolist (path candidates)
+        (when (file-readable-p path)
+          (message "[worktrees] loading setup config: %s" path)
+          (condition-case err
+              (let* ((json-object-type 'alist)
+                     (json-array-type 'list)
+                     (cfg (json-read-file path)))
+                (when cfg (throw 'found cfg)))
+            (error
+             (message "[worktrees] Failed to parse %s: %s" path (error-message-string err))))))
       nil)))
 
 (defun vibemacs-worktrees--run-setup-command (cmd-list target-path repo name index on-success on-failure)
@@ -260,7 +257,7 @@ ON-FAILURE is called with error message if any command fails."
   (message "[worktrees] Starting setup for worktree: %s" name)
   (message "[worktrees] Root worktree: %s" repo)
   (message "[worktrees] Target path: %s" target-path)
-  (let* ((config (vibemacs-worktrees--read-setup-config repo))
+  (let* ((config (vibemacs-worktrees--read-setup-config repo target-path))
          (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
     (message "[worktrees] Config object: %S" config)
     (when config
