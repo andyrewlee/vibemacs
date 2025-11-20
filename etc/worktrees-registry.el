@@ -129,10 +129,20 @@ However, if ROOT matches a registered project path, unregister the project."
   (let ((paths (vibemacs-worktrees--load-registry)))
     (delq nil (mapcar #'vibemacs-worktrees--project-from-path paths))))
 
+(defun vibemacs-worktrees--promote-main-entry (project)
+  "Return PROJECT's worktrees with the primary checkout first.
+Primary is the entry whose root matches the project path; order of the rest is preserved."
+  (let* ((path (vibemacs-project-path project))
+         (all (copy-sequence (vibemacs-project-worktrees project)))
+         (primary (cl-find path all :test #'string= :key #'vibemacs-worktrees--entry-root)))
+    (if (not primary)
+        all
+      (cons primary (cl-remove primary all :test #'eq)))))
+
 (defun vibemacs-worktrees--entries ()
-  "Return all registered worktree entries across all projects."
+  "Return all registered worktree entries across all projects, primary first per project."
   (let ((projects (vibemacs-worktrees--projects)))
-    (mapcan (lambda (p) (copy-sequence (vibemacs-project-worktrees p))) projects)))
+    (mapcan #'vibemacs-worktrees--promote-main-entry projects)))
 
 (defun vibemacs-worktrees--entries-safe ()
   "Return registered worktree entries, or an empty list when none exist."

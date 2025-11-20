@@ -424,29 +424,30 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
               (set-window-buffer terminal-window terminal-buffer)
               (set-window-parameter terminal-window 'window-size-fixed 'width)
               (set-window-parameter terminal-window 'no-delete-other-windows t)))
-          (setq vibemacs-worktrees--center-window status-window)
-          (setq vibemacs-worktrees--right-window (or git-status-window dashboard-window))
-          (setq vibemacs-worktrees--terminal-window terminal-window)
-          (when entry
-            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
-            (vibemacs-worktrees-dashboard--activate entry)
-            (with-selected-window chat-window
+        (setq vibemacs-worktrees--center-window (or status-window chat-window))
+        (setq vibemacs-worktrees--right-window (or git-status-window dashboard-window))
+        (setq vibemacs-worktrees--terminal-window terminal-window)
+        (when entry
+          (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
+          (vibemacs-worktrees-dashboard--activate entry)
+          (with-selected-window chat-window
               (goto-char (point-min))
               (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry)))
               (when (bound-and-true-p hl-line-mode)
                 (hl-line-highlight)))
-            (select-window status-window)
-            (condition-case err
-                (vibemacs-worktrees-center-show-chat entry)
-              (error
-               (message "vibemacs: unable to open chat console (%s)"
-                        (error-message-string err))))
+            (when (window-live-p (or status-window chat-window))
+              (select-window (or status-window chat-window))
+              (condition-case err
+                  (vibemacs-worktrees-center-show-chat entry)
+                (error
+                 (message "vibemacs: unable to open chat console (%s)"
+                          (error-message-string err)))))
             (vibemacs-worktrees--files-refresh entry nil)
             (when dashboard-window
               (vibemacs-worktrees-git-status--populate entry)
               (vibemacs-worktrees-git-status--start-auto-refresh)))
           (setq vibemacs-worktrees--startup-applied t)
-          (when status-window
+          (when (window-live-p status-window)
             (select-window status-window)))))
      ((>= frame-width min-two-column)
       (let* ((max-left (max min-left (- frame-width min-center)))
