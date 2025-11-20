@@ -10,6 +10,8 @@
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
+;; Must be set before Evil/Evil-collection load to avoid warnings.
+(setq evil-want-keybinding nil)
 ;; Start frames at a sane size so the home layout has room on launch.
 (setq frame-resize-pixelwise t)
 (add-to-list 'default-frame-alist '(width . 196))
@@ -35,8 +37,17 @@
   (error
    (message "vibemacs: failed to load worktrees (%s)" (error-message-string err))))
 
-;; Ensure keybound commands autoload even if modules haven’t been loaded yet.
-(autoload 'vibemacs-worktrees-new "worktrees-process" nil t)
+;; Ensure keybound commands always resolve, even if autoloads are stale.
+(unless (fboundp 'vibemacs-worktrees-new)
+  (defun vibemacs-worktrees-new ()
+    "Load worktree helpers and create a new worktree."
+    (interactive)
+    (let ((oldfun (symbol-function 'vibemacs-worktrees-new)))
+      (require 'worktrees-process)
+      (let ((newfun (symbol-function 'vibemacs-worktrees-new)))
+        (if (eq newfun oldfun)
+            (user-error "worktrees-process did not update vibemacs-worktrees-new")
+          (call-interactively newfun))))))
 
 (defvar vibemacs--package-refreshed nil
   "Whether package archives have been refreshed during this session.")
