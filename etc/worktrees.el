@@ -12,7 +12,6 @@
 (require 'worktrees-registry)
 (require 'worktrees-metadata)
 (require 'worktrees-process)
-(require 'worktrees-codex)
 (require 'worktrees-chat)
 (require 'worktrees-dashboard)
 (require 'worktrees-git-status)

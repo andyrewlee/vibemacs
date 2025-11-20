@@ -10,7 +10,7 @@
 ;;; Custom Group
 
 (defgroup vibemacs-worktrees nil
-  "Keyboard-first workflow for managing git worktrees with Codex CLI."
+  "Keyboard-first workflow for managing git worktrees with assistant chat."
   :group 'tools)
 
 ;;; Constants
@@ -21,7 +21,7 @@
   "Default directory under which vibemacs stores persistent data.")
 
 (defconst vibemacs-worktrees-dashboard--row-help
-  "RET: activate • c: Codex plan • A: plan+apply • D: delete"
+  "RET: activate • Tabs switch panes • D: delete"
   "Tooltip displayed when hovering dashboard worktree rows.")
 
 ;;; Customizations
@@ -51,12 +51,6 @@
 (defcustom vibemacs-worktrees-port-range-size 10
   "Number of consecutive ports reserved for each worktree."
   :type 'integer
-  :group 'vibemacs-worktrees)
-
-(defcustom vibemacs-worktrees-codex-executable
-  (or (executable-find "codex") "codex")
-  "Path to the Codex CLI executable."
-  :type 'file
   :group 'vibemacs-worktrees)
 
 (defcustom vibemacs-worktrees-chat-assistants
@@ -112,15 +106,10 @@ When nil, derive the width from the frame size."
                  (integer :tag "Columns"))
   :group 'vibemacs-worktrees)
 
-(defcustom vibemacs-worktrees-codex-log-limit 40
-  "Maximum number of Codex transcript entries stored per worktree."
-  :type 'integer
-  :group 'vibemacs-worktrees)
-
 (defcustom vibemacs-worktrees-review-display 'magit
-  "How vibemacs should present Codex diffs automatically.
-When set to `magit', open `magit-status' after Codex returns a diff.
-When set to `none', stay within the Codex diff buffer that is already shown."
+  "How vibemacs should present diffs automatically.
+When set to `magit', open `magit-status' after generating a diff.
+When set to `none', stay within the diff buffer that is already shown."
   :type '(choice (const :tag "Magit status" magit)
                  (const :tag "Diff buffer only" none))
   :group 'vibemacs-worktrees)
@@ -129,12 +118,12 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 
 (defface vibemacs-worktrees-diff-header
   '((t :inherit warning :weight bold))
-  "Face used for the header line in Codex plan buffers."
+  "Face used for the header line in review buffers."
   :group 'vibemacs-worktrees)
 
 (defface vibemacs-worktrees-highlight
   '((t :inherit region))
-  "Face used to pulse buffers touched by Codex."
+  "Face used to pulse buffers touched by automated edits."
   :group 'vibemacs-worktrees)
 
 (defface vibemacs-worktrees-dashboard-active
@@ -153,15 +142,6 @@ When set to `none', stay within the Codex diff buffer that is already shown."
   :group 'vibemacs-worktrees)
 
 ;;; Variables
-
-(defvar vibemacs-worktrees--codex-history (make-hash-table :test 'equal)
-  "Hash table tracking the most recent Codex result per worktree root.")
-
-(defvar vibemacs-worktrees--changed-buffers (make-hash-table :test 'equal)
-  "Hash table mapping buffer names to previous header-line values.")
-
-(defvar vibemacs-worktrees--activity-buffer-name "*Worktrees Activity*"
-  "Name of the persistent activity log buffer.")
 
 (defvar vibemacs-worktrees-diff-buffer "*vibemacs Diff*"
   "Buffer name for the diff review pane.")
@@ -215,12 +195,6 @@ When set to `none', stay within the Codex diff buffer that is already shown."
 
 (defvar-local vibemacs-worktrees--chat-assistant nil
   "Assistant identifier active in the current chat buffer.")
-
-(defvar-local vibemacs-worktrees--original-header-line nil
-  "Previous header line saved before marking a buffer as Codex-touched.")
-
-(defvar-local vibemacs-worktrees--plan-entry nil
-  "Worktree entry associated with the current Codex review buffer.")
 
 ;;; Data Structures
 

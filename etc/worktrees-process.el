@@ -22,7 +22,6 @@
 (defvar vterm-buffer-name)
 
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
-(declare-function vibemacs-worktrees--files-refresh "worktrees-codex")
 (declare-function vibemacs-worktrees--activate-workspace-layout "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-chat "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-terminal "worktrees-layout")

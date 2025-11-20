@@ -8,7 +8,6 @@
 
 (require 'worktrees-core)
 (require 'worktrees-registry)
-(require 'worktrees-codex)
 (require 'worktrees-chat)
 (require 'cl-lib)
 (require 'diff-mode)
@@ -27,6 +26,17 @@
 (defvar vibemacs-worktrees-chat-assistants)
 (declare-function tabulated-list-goto-id "tabulated-list")
 (declare-function hl-line-highlight "hl-line")
+
+;;; Diff Buffer Helpers
+
+(defun vibemacs-worktrees--diff-buffer ()
+  "Return the shared diff review buffer."
+  (let ((buffer (get-buffer-create vibemacs-worktrees-diff-buffer)))
+    (with-current-buffer buffer
+      (special-mode)
+      (setq-local buffer-read-only t)
+      (setq-local header-line-format nil))
+    buffer))
 
 ;;; Center Pane Management
 
@@ -236,11 +246,8 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
         (message "Center pane not initialised yet.")
       (set-window-parameter vibemacs-worktrees--center-window 'vibemacs-center-entry entry)
       (set-window-parameter vibemacs-worktrees--center-window 'vibemacs-center-active 'diff)
-      (if (and file (not (string-empty-p file)))
-          (let ((buffer (vibemacs-worktrees-center--render-diff entry file)))
-            (set-window-buffer vibemacs-worktrees--center-window buffer))
-        (vibemacs-worktrees--files-refresh entry nil)
-        (set-window-buffer vibemacs-worktrees--center-window (vibemacs-worktrees--diff-buffer)))
+      (let ((buffer (vibemacs-worktrees-center--render-diff entry file)))
+        (set-window-buffer vibemacs-worktrees--center-window buffer))
       (force-mode-line-update t))))
 
 ;;; Startup Layout
@@ -442,7 +449,6 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
                 (error
                  (message "vibemacs: unable to open chat console (%s)"
                           (error-message-string err)))))
-            (vibemacs-worktrees--files-refresh entry nil)
             (when dashboard-window
               (vibemacs-worktrees-git-status--populate entry)
               (vibemacs-worktrees-git-status--start-auto-refresh)))
@@ -478,8 +484,7 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
               (vibemacs-worktrees-center-show-chat entry)
             (error
              (message "vibemacs: unable to open chat console (%s)"
-                      (error-message-string err))))
-          (vibemacs-worktrees--files-refresh entry nil))
+                      (error-message-string err)))))
         (setq vibemacs-worktrees--startup-applied t)
         (select-window center-window)
         (message "vibemacs: frame width %d < %d; showing two-column layout." frame-width min-three-column)))

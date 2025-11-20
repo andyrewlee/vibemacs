@@ -7,7 +7,6 @@
 ;;; Code:
 
 (require 'worktrees-core)
-(require 'worktrees-codex)
 (require 'filenotify)
 (eval-when-compile (require 'evil))
 
@@ -75,7 +74,25 @@
 ;;;###autoload
 (defun vibemacs-worktrees-git-status--populate (entry)
   "Populate the git status sidebar with changed files for ENTRY."
-  (let* ((status-list (vibemacs-worktrees--status-files entry))
+  (let* ((root (vibemacs-worktrees--entry-root entry))
+         (status-list
+          (when (file-directory-p root)
+            (let ((default-directory root))
+              (with-temp-buffer
+                (when (zerop (process-file "git" nil (current-buffer) nil
+                                           "status" "--short" "--untracked-files"))
+                  (goto-char (point-min))
+                  (let (results)
+                    (while (not (eobp))
+                      (let ((line (buffer-substring-no-properties (point) (line-end-position))))
+                        (when (>= (length line) 3)
+                          (let ((code (string-trim (substring line 0 2)))
+                                (path (string-trim (substring line 3))))
+                            (when (string-match "\\(.*\\) -> \\(.*\\)" path)
+                              (setq path (match-string 2 path)))
+                            (push (cons code path) results))))
+                      (forward-line 1))
+                    (nreverse results)))))))
          (buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
     (with-current-buffer buffer
       (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)

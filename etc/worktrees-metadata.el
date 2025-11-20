@@ -53,11 +53,6 @@
     (script-mode . "nonconcurrent")
     (env . ())
     (port-base . nil)
-    (codex . ,(list (cons 'timestamp nil)
-                    (cons 'prompt nil)
-                    (cons 'response nil)
-                    (cons 'files nil)))
-    (codex-log . ())
     (last-active-buffer-name . nil)))
 
 (defun vibemacs-worktrees--save-metadata (entry metadata)

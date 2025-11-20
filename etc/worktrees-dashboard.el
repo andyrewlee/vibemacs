@@ -9,7 +9,6 @@
 (require 'worktrees-git)
 (require 'worktrees-registry)
 (require 'worktrees-metadata)
-(require 'worktrees-codex)
 (require 'cl-lib)
 (require 'tabulated-list)
 (require 'transient)
@@ -24,12 +23,6 @@
 (declare-function vibemacs-worktrees-run-archive "worktrees-process")
 (declare-function vibemacs-worktrees-run-command "worktrees-process")
 (declare-function vibemacs-worktrees-edit-config "worktrees-process")
-(declare-function vibemacs-worktrees-codex-plan "worktrees-codex")
-(declare-function vibemacs-worktrees-codex-apply "worktrees-codex")
-(declare-function vibemacs-worktrees-codex-plan-region "worktrees-codex")
-(declare-function vibemacs-worktrees-review-latest "worktrees-codex")
-(declare-function vibemacs-worktrees-show-activity "worktrees-codex")
-(declare-function vibemacs-worktrees-clear-all-markers "worktrees-codex")
 (declare-function vibemacs-worktrees-center-show-chat "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-terminal "worktrees-layout")
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
@@ -99,8 +92,6 @@
     (define-key map (kbd "d") #'vibemacs-worktrees-dashboard-delete)
     (define-key map (kbd "D") #'vibemacs-worktrees-dashboard-delete)
     (define-key map (kbd "a") #'vibemacs-worktrees-dashboard-archive)
-    (define-key map (kbd "c") #'vibemacs-worktrees-dashboard-codex-plan)
-    (define-key map (kbd "A") #'vibemacs-worktrees-dashboard-codex-apply)
     (define-key map (kbd "f") #'vibemacs-worktrees-dashboard-toggle-dirty-filter)
     map)
   "Keymap for `vibemacs-worktrees-dashboard-mode'.")
@@ -154,18 +145,6 @@
           (format "Running: %s" (or kind "process")))
       "—")))
 
-(defun vibemacs-worktrees-dashboard--codex-summary (metadata)
-  "Derive Codex summary string from METADATA."
-  (let* ((codex (alist-get 'codex metadata))
-         (timestamp (alist-get 'timestamp codex))
-         (prompt (alist-get 'prompt codex)))
-    (if (and timestamp (not (string-empty-p timestamp)))
-        (let ((prompt-fragment (vibemacs-worktrees--truncate prompt 40)))
-          (if prompt-fragment
-              (format "%s · %s" timestamp prompt-fragment)
-            timestamp))
-      nil)))
-
 (defun vibemacs-worktrees-dashboard--format-cell (text row-face &optional entry help)
   "Return TEXT with dashboard hover/selection styling.
 ROW-FACE, when non-nil, is applied as the cell face.
@@ -213,8 +192,8 @@ HELP overrides the default hover tooltip."
                 "Press RET to register a repository")))
     (list '(:add-project . nil) (vector label))))
 
-(defun vibemacs-worktrees-dashboard--worktree-entry (entry status-info codex-str)
-  "Return a formatted row for ENTRY using STATUS-INFO and CODEX-STR."
+(defun vibemacs-worktrees-dashboard--worktree-entry (entry status-info)
+  "Return a formatted row for ENTRY using STATUS-INFO."
   (let* ((root (vibemacs-worktrees--entry-root entry))
          (repo-path (vibemacs-worktrees--entry-repo entry))
          (active (and vibemacs-worktrees--active-root
@@ -225,7 +204,7 @@ HELP overrides the default hover tooltip."
                         (directory-file-name (expand-file-name repo-path)))))
          (row-face (when active 'vibemacs-worktrees-dashboard-active))
          (tooltip (when primary
-                    "RET: activate main • Tabs switch panes • Codex/chat ready"))
+                    "RET: activate main • Tabs switch panes • Chat ready"))
          (name-str (vibemacs-worktrees--entry-name entry))
          (branch-str (vibemacs-worktrees--entry-branch entry))
          (dirty-count (car status-info))
@@ -235,9 +214,7 @@ HELP overrides the default hover tooltip."
                   (propertize " (" 'face 'shadow)
                   (vibemacs-worktrees-dashboard--format-cell branch-str row-face)
                   (propertize ") " 'face 'shadow)
-                  (vibemacs-worktrees-dashboard--format-cell status-str (if (> dirty-count 0) 'warning 'shadow))
-                  (when codex-str
-                    (concat "  " (propertize codex-str 'face 'shadow))))))
+                  (vibemacs-worktrees-dashboard--format-cell status-str (if (> dirty-count 0) 'warning 'shadow)))))
     (list root (vector display-str))))
 
 (defun vibemacs-worktrees-dashboard--entries ()
@@ -253,12 +230,10 @@ HELP overrides the default hover tooltip."
             (push (vibemacs-worktrees-dashboard--create-entry project) rows)
             (dolist (entry (vibemacs-project-worktrees project))
               (let* ((status-info (vibemacs-worktrees-dashboard--git-summary entry))
-                     (dirty-count (car status-info))
-                     (metadata (vibemacs-worktrees--load-metadata entry))
-                     (codex-str (vibemacs-worktrees-dashboard--codex-summary metadata)))
+                     (dirty-count (car status-info)))
                 (when (or (not (eq vibemacs-worktrees-dashboard--filter 'dirty))
                           (> dirty-count 0))
-                  (push (vibemacs-worktrees-dashboard--worktree-entry entry status-info codex-str) rows))))
+                  (push (vibemacs-worktrees-dashboard--worktree-entry entry status-info) rows))))
             (push (list `(:spacer . ,(vibemacs-project-name project)) (vector "")) rows))
           (nreverse rows))
       (list (vibemacs-worktrees-dashboard--add-project-entry)))))
@@ -489,7 +464,6 @@ HELP overrides the default hover tooltip."
            (progn
              (vibemacs-worktrees-dashboard--activate entry)
              (vibemacs-worktrees--activate-workspace-layout entry)
-             (vibemacs-worktrees--files-refresh entry nil)
              (vibemacs-worktrees-center-show-chat entry)
              (message "Activated worktree %s" (vibemacs-worktrees--entry-name entry))
              (ignore-errors (tabulated-list-goto-id (vibemacs-worktrees--entry-root entry))))
@@ -588,24 +562,6 @@ HELP overrides the default hover tooltip."
           (message "Deleted worktree %s" (vibemacs-worktrees--entry-name entry))))
     (message "No worktree selected")))
 
-(defun vibemacs-worktrees-dashboard-codex-plan ()
-  "Trigger Codex plan from the dashboard."
-  (interactive)
-  (if-let ((entry (vibemacs-worktrees-dashboard--current-entry)))
-      (progn
-        (vibemacs-worktrees-dashboard--activate entry)
-        (vibemacs-worktrees-codex-plan entry))
-    (message "No worktree selected")))
-
-(defun vibemacs-worktrees-dashboard-codex-apply ()
-  "Trigger Codex plan-and-apply from the dashboard."
-  (interactive)
-  (if-let ((entry (vibemacs-worktrees-dashboard--current-entry)))
-      (progn
-        (vibemacs-worktrees-dashboard--activate entry)
-        (vibemacs-worktrees-codex-apply entry))
-    (message "No worktree selected")))
-
 ;;;###autoload
 (defun vibemacs-worktrees-dashboard ()
   "Display the vibemacs dashboard view."
@@ -620,21 +576,14 @@ HELP overrides the default hover tooltip."
    ("n" "New worktree" vibemacs-worktrees-new)
    ("l" "List worktrees" vibemacs-worktrees-list)
    ("a" "Archive worktree" vibemacs-worktrees-archive)
-   ("d" "Dashboard" vibemacs-worktrees-dashboard)
-   ("V" "Review latest" vibemacs-worktrees-review-latest)]
+   ("d" "Dashboard" vibemacs-worktrees-dashboard)]
   ["Scripts & Tools"
    ("s" "Run setup" vibemacs-worktrees-run-setup)
    ("r" "Run main" vibemacs-worktrees-run)
    ("f" "Run archive" vibemacs-worktrees-run-archive)
    ("c" "Choose script" vibemacs-worktrees-run-command)
    ("t" "Open terminal" vibemacs-worktrees-open-terminal)
-   ("e" "Edit config" vibemacs-worktrees-edit-config)
-   ("v" "View activity" vibemacs-worktrees-show-activity)
-   ("C" "Clear markers" vibemacs-worktrees-clear-all-markers)]
-  ["Codex"
-   ("p" "Plan (Codex)" vibemacs-worktrees-codex-plan)
-   ("A" "Plan + apply" vibemacs-worktrees-codex-apply)
-   ("R" "Plan region" vibemacs-worktrees-codex-plan-region)])
+   ("e" "Edit config" vibemacs-worktrees-edit-config)])
 
 (provide 'worktrees-dashboard)
 ;;; worktrees-dashboard.el ends here
