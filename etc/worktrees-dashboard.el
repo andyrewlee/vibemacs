@@ -408,9 +408,13 @@ HELP overrides the default hover tooltip."
     buffer))
 
 (defun vibemacs-worktrees-dashboard--maybe-refresh ()
-  "Refresh the dashboard if the current buffer uses the dashboard mode."
-  (when (derived-mode-p 'vibemacs-worktrees-dashboard-mode)
-    (vibemacs-worktrees-dashboard--rebuild)))
+  "Refresh the dashboard buffer when it exists.
+Intended for callers like async sentinels where the current buffer
+is not the dashboard."
+  (when-let ((buffer (get-buffer vibemacs-worktrees-dashboard-buffer)))
+    (with-current-buffer buffer
+      (when (derived-mode-p 'vibemacs-worktrees-dashboard-mode)
+        (vibemacs-worktrees-dashboard--rebuild)))))
 
 (defun vibemacs-worktrees-dashboard--activate (entry)
   "Mark ENTRY as active in the dashboard and refresh row styling."
