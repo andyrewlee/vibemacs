@@ -7,14 +7,14 @@ Add the missing run-script engine so setup/run/archive commands work, manage pro
 Use metadata `scripts` entries, build env with `vibemacs-worktrees--script-env`, honor `script-mode` concurrency, store processes in `vibemacs-worktrees--processes`, attach sentinels to refresh dashboard/git-status, and name output buffers per worktree (e.g., `*worktree-<name>-<script>*`).
 
 **Checklist Items**  
-- [ ] Locate or create `vibemacs-worktrees--run-script` in `etc/worktrees-process.el`.  
-- [ ] Load metadata via `vibemacs-worktrees--load-metadata`; resolve script text for the requested key (`setup`/`run`/`archive`).  
-- [ ] Build environment list with `vibemacs-worktrees--script-env` and bind `process-environment` before launch.  
-- [ ] Invoke `vibemacs-worktrees--stop-existing-process` when `script-mode` is nonconcurrent.  
-- [ ] Start process with working directory at worktree root; route output to a dedicated buffer per worktree+script.  
-- [ ] Store process in `vibemacs-worktrees--processes` and tag properties `vibemacs-kind`, `vibemacs-root`.  
-- [ ] Add process sentinel to clear hash entry and trigger dashboard/git-status refresh on exit.  
-- [ ] Handle empty/missing script strings with a clear user-facing error.  
+- [x] Locate or create `vibemacs-worktrees--run-script` in `etc/worktrees-process.el`.  
+- [x] Load metadata via `vibemacs-worktrees--load-metadata`; resolve script text for the requested key (`setup`/`run`/`archive`).  
+- [x] Build environment list with `vibemacs-worktrees--script-env` and bind `process-environment` before launch.  
+- [x] Invoke `vibemacs-worktrees--stop-existing-process` when `script-mode` is nonconcurrent.  
+- [x] Start process with working directory at worktree root; route output to a dedicated buffer per worktree+script.  
+- [x] Store process in `vibemacs-worktrees--processes` and tag properties `vibemacs-kind`, `vibemacs-root`.  
+- [x] Add process sentinel to clear hash entry and trigger dashboard/git-status refresh on exit.  
+- [x] Handle empty/missing script strings with a clear user-facing error.  
 
 **User Stories (Gherkin Format)**  
 - Given a worktree with a `run` script in metadata, when I invoke `SPC a r`, then the command launches in the worktree root and its output appears in a named buffer.  
@@ -31,10 +31,10 @@ Ensure base refs are parsed correctly and covered by automated tests.
 The git call in `vibemacs-worktrees--entry-from-record` currently passes a malformed `@{upstream}` argument; correct it and cover with ERT using a stub for `vibemacs-worktrees--call-git`.
 
 **Checklist Items**  
-- [ ] Fix the `@{upstream}` invocation in `etc/worktrees-git.el` to remove embedded whitespace/newline.  
-- [ ] Add `etc/worktrees-git-test.el` with stubbed `vibemacs-worktrees--call-git` to assert `:base` is populated from upstream.  
-- [ ] Add tests for main-entry promotion and default target directory naming/hashing.  
-- [ ] Wire tests to run via `emacs -Q --batch -L etc -l ert -l etc/worktrees-git-test.el -f ert-run-tests-batch-and-exit`.  
+- [x] Fix the `@{upstream}` invocation in `etc/worktrees-git.el` to remove embedded whitespace/newline.  
+- [x] Add `etc/worktrees-git-test.el` with stubbed `vibemacs-worktrees--call-git` to assert `:base` is populated from upstream.  
+- [x] Add tests for main-entry promotion and default target directory naming/hashing.  
+- [x] Wire tests to run via `emacs -Q --batch -L etc -l ert -l etc/worktrees-git-test.el -f ert-run-tests-batch-and-exit`.  
 
 **User Stories (Gherkin Format)**  
 - Given a worktree record with `branch` and upstream, when `vibemacs-worktrees--entry-from-record` runs, then the resulting entry sets `base` to the upstream ref.  
@@ -50,7 +50,7 @@ Make layout creation deterministic and readable, with correct window role assign
 Introduce pure helpers (`vibemacs-worktrees--desired-widths frame-width` and `vibemacs-worktrees--apply-layout entry widths`) and ensure `vibemacs-worktrees--center-window` always references the chat/diff pane. Preserve existing three/two/single column behaviors.
 
 **Checklist Items**  
-- [ ] Extract width computation into a pure helper that returns left/center/right sizing decisions.  
+- [x] Extract width computation into a pure helper that returns left/center/right sizing decisions.  
 - [ ] Extract window construction into an apply helper that returns a struct/alist of window roles.  
 - [ ] Set `vibemacs-worktrees--center-window` to the chat/diff pane; avoid reusing variable names for different roles.  
 - [ ] Reuse helpers in both startup and workspace layout code paths.  
@@ -70,8 +70,8 @@ Keep built-in libraries available when `EMACSLOADPATH` is set for vibemacs.
 Expand `load-path` by prepending `EMACSLOADPATH` entries instead of replacing defaults; document the recommended `EMACSLOADPATH=$PWD:` pattern in README.
 
 **Checklist Items**  
-- [ ] Modify `init.el` to append split `EMACSLOADPATH` to `load-path` before requiring `jka-compr`.  
-- [ ] Update README “Setup/byte-compile” instructions to include the trailing colon variant.  
+- [x] Modify `init.el` to append split `EMACSLOADPATH` to `load-path` before requiring `jka-compr`.  
+- [x] Update README “Setup/byte-compile” instructions to include the trailing colon variant.  
 - [ ] Re-run batch byte-compile with `EMACSLOADPATH=$PWD:` to confirm `jka-compr` loads.  
 
 **User Stories (Gherkin Format)**  
@@ -87,10 +87,10 @@ Prevent dashboard freezes by avoiding synchronous `git status` per refresh.
 Queue `git status --short` via `make-process` per project or cache results with a short TTL; update rows when results arrive and fall back to last-known counts.
 
 **Checklist Items**  
-- [ ] Introduce a cache structure keyed by worktree root storing dirty counts and timestamps.  
-- [ ] Replace synchronous `vibemacs-worktrees-dashboard--git-summary` calls with async jobs or cache lookups.  
-- [ ] Update dashboard refresh to redraw rows when async results return.  
-- [ ] Handle failures gracefully (show “Error” but keep UI responsive).  
+- [x] Introduce a cache structure keyed by worktree root storing dirty counts and timestamps.  
+- [x] Replace synchronous `vibemacs-worktrees-dashboard--git-summary` calls with async jobs or cache lookups.  
+- [x] Update dashboard refresh to redraw rows when async results return.  
+- [x] Handle failures gracefully (show “Error” but keep UI responsive).  
 
 **User Stories (Gherkin Format)**  
 - Given many worktrees, when I open the dashboard, then it renders immediately and populates dirty counts progressively without blocking.  
@@ -105,7 +105,7 @@ Provide regression safety for git parsing and layout role assignment.
 House tests under `etc/` to mirror modules; use stubs for git calls and window sizing to keep tests fast and batchable.
 
 **Checklist Items**  
-- [ ] Implement `etc/worktrees-layout-test.el` to simulate wide/medium/narrow frame widths and assert window role assignment helpers.  
+- [x] Implement `etc/worktrees-layout-test.el` to simulate wide/medium/narrow frame widths and assert window mode selection.  
 - [ ] Ensure tests don’t require GUI; mock width computations rather than creating frames.  
 - [ ] Add test targets to developer docs (`README` or `AGENTS.md` notes).  
 - [ ] Add a convenience script/command snippet for running both git and layout tests together.  
@@ -123,8 +123,8 @@ Reduce noise during setup and guard vterm interactions against dead processes.
 Introduce a verbosity flag/variable for setup logging and guard `vibemacs-worktrees--send-multiline-to-vterm` with process checks.
 
 **Checklist Items**  
-- [ ] Add a defcustom (or internal var) to toggle verbose setup logging; default to quiet.  
-- [ ] Wrap noisy `message` calls in setup command runner with the verbosity gate.  
+- [x] Add a defcustom (or internal var) to toggle verbose setup logging; default to quiet.  
+- [x] Wrap noisy `message` calls in setup command runner with the verbosity gate.  
 - [ ] Check for a live vterm process before sending bracketed paste; emit a friendly warning otherwise.  
 
 **User Stories (Gherkin Format)**  
