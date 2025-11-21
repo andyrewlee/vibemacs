@@ -1,5 +1,8 @@
 ;;; worktrees-layout-test.el --- Tests for layout helpers -*- lexical-binding: t; -*-
 
+;; Preload jka-compr before flipping load-prefer-newer to avoid recursive load in batch.
+(let ((load-prefer-newer nil))
+  (require 'jka-compr))
 (setq load-prefer-newer t)
 (require 'ert)
 (require 'worktrees-layout)
