@@ -34,6 +34,12 @@
 (declare-function hl-line-highlight "hl-line")
 (defvar magit-display-buffer-function)
 
+(defvar vibemacs-worktrees-dashboard--status-cache (make-hash-table :test 'equal)
+  "Cache of git status summaries keyed by expanded worktree root.")
+
+(defvar vibemacs-worktrees-dashboard--status-ttl 5
+  "Seconds a cached git status remains fresh.")
+
 ;;; Simple List Mode
 
 ;;;###autoload
@@ -126,15 +132,58 @@
 
 (defun vibemacs-worktrees-dashboard--git-summary (entry)
   "Return cons of (DIRTY-COUNT . STATUS-STRING) for ENTRY."
-  (condition-case err
-      (let* ((root (vibemacs-worktrees--entry-root entry))
-             (output (vibemacs-worktrees--call-git root "status" "--short"))
-             (lines (split-string output "\n" t))
-             (count (length lines)))
-        (if (zerop count)
-            (cons 0 "Clean")
-          (cons count (format "+%d change%s" count (if (= count 1) "" "s")))))
-    (error (cons 0 (format "Error: %s" (error-message-string err))))))
+  (let* ((root (vibemacs-worktrees--entry-root entry))
+         (key (expand-file-name root))
+         (cached (gethash key vibemacs-worktrees-dashboard--status-cache))
+         (fresh (and cached
+                     (< (- (float-time) (plist-get cached :ts))
+                        vibemacs-worktrees-dashboard--status-ttl))))
+    (unless (or fresh (plist-get cached :running))
+      (vibemacs-worktrees-dashboard--enqueue-status entry))
+    (if (and cached (or fresh (plist-get cached :running)))
+        (cons (or (plist-get cached :count) 0)
+              (or (plist-get cached :status) "…"))
+      ;; No cache yet: return placeholder while async finishes.
+      (cons 0 "…"))))
+
+(defun vibemacs-worktrees-dashboard--enqueue-status (entry)
+  "Spawn async git status for ENTRY unless one is already running."
+  (let* ((root (vibemacs-worktrees--entry-root entry))
+         (key (expand-file-name root))
+         (existing (gethash key vibemacs-worktrees-dashboard--status-cache)))
+    (when (plist-get existing :running)
+      (cl-return-from vibemacs-worktrees-dashboard--enqueue-status existing))
+    (let* ((default-directory root)
+           (buffer (generate-new-buffer (format " *vibemacs-git-%s*" (md5 key))))
+           (process
+            (make-process
+             :name (format "vibemacs-git-%s" (md5 key))
+             :buffer buffer
+             :noquery t
+             :command '("git" "status" "--short")
+             :sentinel
+             (lambda (proc event)
+               (when (string-match-p "finished\\|exited\\|failed\\|deleted" event)
+                 (let* ((exit (process-exit-status proc))
+                        (out (when (buffer-live-p buffer)
+                               (with-current-buffer buffer
+                                 (buffer-string))))
+                        (lines (and out (split-string out "\n" t)))
+                        (count (length (or lines '())))
+                        (status (cond
+                                 ((zerop exit)
+                                  (if (zerop count)
+                                      "Clean"
+                                    (format "+%d change%s" count (if (= count 1) "" "s"))))
+                                 (t (format "Error (exit %s)" exit))))
+                        (ts (float-time)))
+                   (puthash key (list :count count :status status :ts ts :running nil)
+                            vibemacs-worktrees-dashboard--status-cache)
+                   (when (buffer-live-p buffer) (kill-buffer buffer))
+                   (ignore-errors (vibemacs-worktrees-dashboard--maybe-refresh))))))))
+      (puthash key (list :running t :status "…" :ts (float-time))
+               vibemacs-worktrees-dashboard--status-cache)
+      process)))
 
 (defun vibemacs-worktrees-dashboard--running-summary (entry)
   "Return a string describing running scripts for ENTRY."

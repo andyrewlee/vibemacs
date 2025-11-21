@@ -67,9 +67,11 @@ Placeholders in the template should be in the form {placeholder}."
 (defun vibemacs-worktrees--send-multiline-to-vterm (text)
   "Send multi-line TEXT to vterm using bracketed paste mode.
 This allows newlines to be preserved without executing the command."
-  ;; Enable bracketed paste mode, send text, disable bracketed paste
-  (process-send-string (get-buffer-process (current-buffer))
-                       (concat "\e[200~" text "\e[201~")))
+  (let ((proc (get-buffer-process (current-buffer))))
+    (if (and proc (process-live-p proc))
+        ;; Enable bracketed paste mode, send text, disable bracketed paste
+        (process-send-string proc (concat "\e[200~" text "\e[201~")))
+      (message "vibemacs: chat/terminal process is not active")))
 
 ;;; Chat Buffer Management
 

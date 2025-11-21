@@ -24,3 +24,11 @@ Worktrees are created under `~/.vibemacs/worktrees/<repo-name>/`:
 - **Metadata**: `~/.vibemacs/worktrees-metadata/<hash>/worktree.json`
 - **Registry**: `~/.vibemacs/projects.json`
 - **Per-project scripts**: `.vibemacs/worktrees.json` inside a repo defines setup/run/archive commands
+
+### Byte-compiling / batch runs
+
+When batch-compiling with a custom `EMACSLOADPATH`, keep built-ins on the path:
+
+```bash
+EMACSLOADPATH=$PWD: emacs -Q --batch -l init.el -f batch-byte-compile etc/worktrees-*.el
+```
