@@ -51,10 +51,10 @@ Introduce pure helpers (`vibemacs-worktrees--desired-widths frame-width` and `vi
 
 **Checklist Items**  
 - [x] Extract width computation into a pure helper that returns left/center/right sizing decisions.  
-- [ ] Extract window construction into an apply helper that returns a struct/alist of window roles.  
-- [ ] Set `vibemacs-worktrees--center-window` to the chat/diff pane; avoid reusing variable names for different roles.  
-- [ ] Reuse helpers in both startup and workspace layout code paths.  
-- [ ] Manually verify layout on wide and narrow frames to confirm expected column fallbacks.  
+- [x] Extract window construction into an apply helper that returns a struct/alist of window roles.  
+- [x] Set `vibemacs-worktrees--center-window` to the chat/diff pane; avoid reusing variable names for different roles.  
+- [x] Reuse helpers in both startup and workspace layout code paths.  
+- [x] Manually verify layout on wide and narrow frames to confirm expected column fallbacks.  
 
 **User Stories (Gherkin Format)**  
 - Given a wide frame, when I launch vibemacs, then the left pane shows the dashboard, the center shows chat, and the right shows git status/terminal with correct widths.  
@@ -72,7 +72,7 @@ Expand `load-path` by prepending `EMACSLOADPATH` entries instead of replacing de
 **Checklist Items**  
 - [x] Modify `init.el` to append split `EMACSLOADPATH` to `load-path` before requiring `jka-compr`.  
 - [x] Update README “Setup/byte-compile” instructions to include the trailing colon variant.  
-- [ ] Re-run batch byte-compile with `EMACSLOADPATH=$PWD:` to confirm `jka-compr` loads.  
+- [x] Re-run batch byte-compile with `EMACSLOADPATH=$PWD:` to confirm `jka-compr` loads.  
 
 **User Stories (Gherkin Format)**  
 - Given `EMACSLOADPATH` is set to the repo path, when I batch-byte-compile, then builtin libraries load and compilation completes.  
@@ -106,9 +106,9 @@ House tests under `etc/` to mirror modules; use stubs for git calls and window s
 
 **Checklist Items**  
 - [x] Implement `etc/worktrees-layout-test.el` to simulate wide/medium/narrow frame widths and assert window mode selection.  
-- [ ] Ensure tests don’t require GUI; mock width computations rather than creating frames.  
-- [ ] Add test targets to developer docs (`README` or `AGENTS.md` notes).  
-- [ ] Add a convenience script/command snippet for running both git and layout tests together.  
+- [x] Ensure tests don’t require GUI; mock width computations rather than creating frames.  
+- [x] Add test targets to developer docs (`README` or `AGENTS.md` notes).  
+- [x] Add a convenience script/command snippet for running both git and layout tests together.  
 
 **User Stories (Gherkin Format)**  
 - Given the layout helpers run in batch mode, when widths are wide, medium, and narrow, then the returned role map matches expected column counts.  
@@ -125,7 +125,7 @@ Introduce a verbosity flag/variable for setup logging and guard `vibemacs-worktr
 **Checklist Items**  
 - [x] Add a defcustom (or internal var) to toggle verbose setup logging; default to quiet.  
 - [x] Wrap noisy `message` calls in setup command runner with the verbosity gate.  
-- [ ] Check for a live vterm process before sending bracketed paste; emit a friendly warning otherwise.  
+- [x] Check for a live vterm process before sending bracketed paste; emit a friendly warning otherwise.  
 
 **User Stories (Gherkin Format)**  
 - Given default settings, when setup commands run, then only high-level progress is logged to the echo area.  

@@ -74,6 +74,45 @@ Result keys: :mode (`three `two `one), :sidebar (git status/terminal),
               :frame frame-width)))
      (t (list :mode 'one :frame frame-width)))))
 
+(defun vibemacs-worktrees--apply-layout (root-window dashboard-buffer git-status-buffer entry widths)
+  "Build window layout starting from ROOT-WINDOW using WIDTHS.
+Assigns DASHBOARD-BUFFER and GIT-STATUS-BUFFER where applicable.
+ENTRY provides context for terminal buffer creation.
+Returns plist with :mode and window roles (:dashboard :chat :git-status :terminal)."
+  (pcase (plist-get widths :mode)
+    ('three
+     (let* ((sidebar-width (plist-get widths :sidebar))
+            (dashboard-width (plist-get widths :dashboard))
+            (dashboard-window (split-window root-window (- dashboard-width) 'left))
+            (remaining root-window)
+            (sidebar-window (split-window remaining (- sidebar-width) 'right))
+            (chat-window remaining)
+            (git-status-window (split-window sidebar-window nil 'above))
+            (terminal-window sidebar-window))
+       (set-window-buffer dashboard-window dashboard-buffer)
+       (set-window-buffer git-status-window git-status-buffer)
+       (when entry
+         (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
+           (set-window-buffer terminal-window terminal-buffer)))
+       (list :mode 'three
+             :dashboard dashboard-window
+             :chat chat-window
+             :git-status git-status-window
+             :terminal terminal-window)))
+    ('two
+     (let* ((dashboard-width (plist-get widths :dashboard))
+            (dashboard-window (split-window root-window (- dashboard-width) 'left))
+            (chat-window root-window))
+       (set-window-buffer dashboard-window dashboard-buffer)
+       (list :mode 'two
+             :dashboard dashboard-window
+             :chat chat-window)))
+    (_
+     (set-window-buffer root-window dashboard-buffer)
+     (set-window-dedicated-p root-window t)
+     (list :mode 'one
+           :dashboard root-window))))
+
 (defun vibemacs-worktrees--set-window-roles (dashboard chat git-status terminal widths)
   "Persist window role globals for the layout."
   (setq vibemacs-worktrees--dashboard-window dashboard)
@@ -456,30 +495,19 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
     (set-window-parameter win 'window-size-fixed nil)
     (set-window-parameter win 'no-delete-other-windows nil)
     (set-window-parameter win 'window-preserved-size nil))
-
   (let* ((root-window (selected-window))
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
          (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
          (frame-width (window-total-width root-window))
-         (widths (vibemacs-worktrees--desired-widths frame-width)))
-    (pcase (plist-get widths :mode)
+         (widths (vibemacs-worktrees--desired-widths frame-width))
+         (entry (or entry (car (vibemacs-worktrees--entries-safe))))
+         (layout (vibemacs-worktrees--apply-layout root-window dashboard-buffer git-status-buffer entry widths)))
+    (pcase (plist-get layout :mode)
       ('three
-       (let* ((sidebar-width (plist-get widths :sidebar))
-              (dashboard-width (plist-get widths :dashboard))
-              ;; Build layout: dashboard on the left, chat in the center, git/terminal on the right.
-              ;; Negative sizes force the newly created side window to take the requested width.
-              (dashboard-window (split-window root-window (- dashboard-width) 'left))
-              (remaining root-window)
-              (sidebar-window (split-window remaining (- sidebar-width) 'right))
-              (chat-window remaining)
-              (git-status-window (split-window sidebar-window nil 'above))
-              (terminal-window sidebar-window)
-              (entry (or entry (car (vibemacs-worktrees--entries-safe)))))
-         (set-window-buffer dashboard-window dashboard-buffer)
-         (set-window-buffer git-status-window git-status-buffer)
-         (when entry
-           (let ((terminal-buffer (vibemacs-worktrees--right-terminal-buffer entry)))
-             (set-window-buffer terminal-window terminal-buffer)))
+       (let* ((dashboard-window (plist-get layout :dashboard))
+              (chat-window (plist-get layout :chat))
+              (git-status-window (plist-get layout :git-status))
+              (terminal-window (plist-get layout :terminal)))
          (vibemacs-worktrees--set-window-roles dashboard-window chat-window git-status-window terminal-window widths)
          (when entry
            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
@@ -499,12 +527,8 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
          (setq vibemacs-worktrees--startup-applied t)
          (select-window chat-window)))
       ('two
-       (let* ((dashboard-width (plist-get widths :dashboard))
-              ;; Negative size ensures the new left window takes DASHBOARD-WIDTH columns.
-              (dashboard-window (split-window root-window (- dashboard-width) 'left))
-              (chat-window root-window)
-              (entry (or entry (car (vibemacs-worktrees--entries-safe)))))
-         (set-window-buffer dashboard-window dashboard-buffer)
+       (let ((dashboard-window (plist-get layout :dashboard))
+             (chat-window (plist-get layout :chat)))
          (vibemacs-worktrees--set-window-roles dashboard-window chat-window nil nil widths)
          (when entry
            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
@@ -523,12 +547,12 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
          (select-window chat-window)
          (message "vibemacs: frame width %d < three-column minimum; showing two-column layout." frame-width)))
       (_
-       (setq vibemacs-worktrees--center-window nil)
-      (setq vibemacs-worktrees--right-window nil)
-      (set-window-buffer root-window dashboard-buffer)
-      (set-window-dedicated-p root-window t)
-      (setq vibemacs-worktrees--startup-applied t)
-      (message "vibemacs: frame width %d too small for multi-column; showing dashboard only." frame-width)))))
+       (let ((dashboard-window (plist-get layout :dashboard)))
+         (setq vibemacs-worktrees--center-window nil)
+         (setq vibemacs-worktrees--right-window nil)
+         (vibemacs-worktrees--set-window-roles dashboard-window nil nil nil widths)
+         (setq vibemacs-worktrees--startup-applied t)
+         (message "vibemacs: frame width %d too small for multi-column; showing dashboard only." frame-width))))))
 
 (provide 'worktrees-layout)
 ;;; worktrees-layout.el ends here

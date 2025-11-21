@@ -32,3 +32,11 @@ When batch-compiling with a custom `EMACSLOADPATH`, keep built-ins on the path:
 ```bash
 EMACSLOADPATH=$PWD: emacs -Q --batch -l init.el -f batch-byte-compile etc/worktrees-*.el
 ```
+
+### Tests
+
+Run the fast suite (byte-compile + git + layout ERT) with:
+
+```bash
+make test
+```

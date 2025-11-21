@@ -22,6 +22,12 @@
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 
+(defun vibemacs-worktrees--with-live-vterm (proc action)
+  "Run ACTION with PROC when PROC is live; otherwise warn."
+  (if (and proc (process-live-p proc))
+      (funcall action proc)
+    (message "[worktrees] Terminal is not active; reopen the chat/agent tab to restart.")))
+
 ;;; Prompt Loading
 
 (defun vibemacs-worktrees--load-prompt-template (filename)
@@ -133,9 +139,12 @@ ASSISTANT is the identifier configured for the chat session."
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
-            (vterm-send-string command)
-            (vterm-send-return)
-            (setq-local vibemacs-worktrees--chat-command-started t)))))
+            (vibemacs-worktrees--with-live-vterm
+             proc
+             (lambda (_)
+               (vterm-send-string command)
+               (vterm-send-return)
+               (setq-local vibemacs-worktrees--chat-command-started t)))))))
     buffer))
 
 ;;; Interactive Commands
@@ -187,9 +196,12 @@ Returns the created buffer."
             (setq-local vibemacs-worktrees--buffer-root current-root)
             ;; Launch the agent command
             (when-let ((proc (get-buffer-process buffer)))
-              (vterm-send-string command)
-              (vterm-send-return)
-              (setq-local vibemacs-worktrees--chat-command-started t)))))
+              (vibemacs-worktrees--with-live-vterm
+               proc
+               (lambda (_)
+                 (vterm-send-string command)
+                 (vterm-send-return)
+                 (setq-local vibemacs-worktrees--chat-command-started t)))))))
       ;; Always configure tab-line for the buffer
       (when buffer
         (with-current-buffer buffer
