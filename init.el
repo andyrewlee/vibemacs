@@ -8,9 +8,13 @@
 ;;; Code:
 
 ;; Prefer newer source over compiled bytecode during development.
-;; Load jka-compr first to avoid a known recursive-load bug when .el.gz
-;; files are on `load-path` and `load-prefer-newer` is non-nil.
-(let ((load-prefer-newer nil))
+;; Ensure built-ins remain reachable even when EMACSLOADPATH is set for vibemacs.
+(let* ((load-prefer-newer nil)
+       (env-path (getenv "EMACSLOADPATH")))
+  (when (and env-path (not (string-empty-p env-path)))
+    ;; Prepend custom paths while keeping default load-path entries.
+    (setq load-path (append (split-string env-path path-separator t) load-path)))
+  ;; Load jka-compr before enabling load-prefer-newer to avoid recursive-load bug.
   (require 'jka-compr))
 (setq load-prefer-newer t)
 

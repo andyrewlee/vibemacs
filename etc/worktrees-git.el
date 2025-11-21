@@ -114,8 +114,7 @@ Signals an error if the command exits with non-zero."
                   ((string-prefix-p "refs/heads/" branch) (substring branch 11))
                   (t branch)))
          (base (condition-case nil
-                   (let ((up (vibemacs-worktrees--call-git path "rev-parse" "--abbrev-ref" "@{upstream}
-            ")))
+                   (let ((up (vibemacs-worktrees--call-git path "rev-parse" "--abbrev-ref" "@{upstream}")))
                      (if (string-empty-p up) "" up))
                  (error "")))
          (created (format-time-string "%Y-%m-%dT%H:%M:%S%z"

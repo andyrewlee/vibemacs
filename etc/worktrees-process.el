@@ -25,6 +25,10 @@
 (declare-function vibemacs-worktrees--activate-workspace-layout "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-chat "worktrees-layout")
 (declare-function vibemacs-worktrees-center-show-terminal "worktrees-layout")
+(declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
+(declare-function vibemacs-worktrees-dashboard--maybe-refresh "worktrees-dashboard")
+(declare-function vibemacs-worktrees-git-status--populate "worktrees-git-status")
+(declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-git-status")
 
 ;;; Terminal Functions
 
@@ -89,6 +93,56 @@ If ENTRY is nil prompt the user."
       (remhash root vibemacs-worktrees--processes)
       (message "Stopped existing process for %s" root))))
 
+(defun vibemacs-worktrees--script-buffer-name (entry script)
+  "Return buffer name for worktree ENTRY and SCRIPT symbol."
+  (format "*worktree-%s-%s*" (vibemacs-worktrees--entry-name entry) script))
+
+(defun vibemacs-worktrees--run-script (entry script)
+  "Execute SCRIPT (symbol) for ENTRY, handling env, concurrency, and UI refresh."
+  (unless entry
+    (user-error "Select a worktree to run a script"))
+  (let* ((metadata (vibemacs-worktrees--load-metadata entry))
+         (scripts (vibemacs-worktrees--scripts metadata))
+         (command (alist-get script scripts))
+         (root (vibemacs-worktrees--entry-root entry))
+         (name (vibemacs-worktrees--entry-name entry)))
+    (unless (and (stringp command) (not (string-empty-p command)))
+      (user-error "No %s script configured for %s" script name))
+    (vibemacs-worktrees--stop-existing-process root metadata)
+    (let* ((env (vibemacs-worktrees--script-env entry metadata))
+           (process-environment (append env process-environment))
+           (default-directory root)
+           (buffer-name (vibemacs-worktrees--script-buffer-name entry script))
+           (buffer (get-buffer-create buffer-name)))
+      (with-current-buffer buffer
+        (special-mode)
+        (setq buffer-read-only nil)
+        (goto-char (point-max))
+        (insert (format "[worktrees] (%s) %s\n" name command)))
+      (let ((proc (start-process-shell-command
+                   (format "worktrees-%s-%s" name script)
+                   buffer
+                   command)))
+        (process-put proc 'vibemacs-kind script)
+        (process-put proc 'vibemacs-root root)
+        (puthash root proc vibemacs-worktrees--processes)
+        (set-process-sentinel
+         proc
+         (lambda (process event)
+           (when (string-match-p "finished\\|exited\\|killed\\|deleted" event)
+             (let ((root (process-get process 'vibemacs-root)))
+               (remhash root vibemacs-worktrees--processes))
+             (when (fboundp 'vibemacs-worktrees-dashboard--maybe-refresh)
+               (ignore-errors (vibemacs-worktrees-dashboard--maybe-refresh)))
+             (when (and (fboundp 'vibemacs-worktrees-center--current-entry)
+                        (fboundp 'vibemacs-worktrees-git-status--populate))
+               (ignore-errors
+                 (when-let ((current (vibemacs-worktrees-center--current-entry)))
+                   (vibemacs-worktrees-git-status--populate current)
+                   (vibemacs-worktrees-git-status--start-auto-refresh)))))))
+        (message "[worktrees] Running %s for %s (buffer %s)" script name buffer-name)
+        buffer))))
+
 ;;;###autoload
 (defun vibemacs-worktrees-run-setup (&optional entry)
   "Run the setup script for ENTRY or prompt for one."
@@ -142,18 +196,25 @@ Return parsed alist or nil if no readable/valid config is found."
     (catch 'found
       (dolist (path candidates)
         (when (file-readable-p path)
-          (message "[worktrees] loading setup config: %s" path)
+          (when vibemacs-worktrees-setup-verbose-logging
+            (message "[worktrees] loading setup config: %s" path))
           (condition-case err
               (let* ((json-object-type 'alist)
                      (json-array-type 'list)
                      (cfg (json-read-file path)))
                 (when cfg (throw 'found cfg)))
             (error
-             (message "[worktrees] Failed to parse %s: %s" path (error-message-string err))))))
+             (when vibemacs-worktrees-setup-verbose-logging
+               (message "[worktrees] Failed to parse %s: %s" path (error-message-string err)))))))
       nil)))
 
 (defcustom vibemacs-worktrees-setup-continue-on-error t
   "Whether to continue executing remaining setup-worktree commands after a failure."
+  :type 'boolean
+  :group 'vibemacs)
+
+(defcustom vibemacs-worktrees-setup-verbose-logging nil
+  "When non-nil, emit detailed progress logs during setup commands."
   :type 'boolean
   :group 'vibemacs)
 
@@ -212,21 +273,24 @@ REPO is the root worktree path, TARGET-PATH is the new worktree path,
 and NAME is the worktree name.
 ON-SUCCESS is called when all commands complete successfully.
 ON-FAILURE is called with error message if any command fails."
-  (message "[worktrees] Starting setup for worktree: %s" name)
-  (message "[worktrees] Root worktree: %s" repo)
-  (message "[worktrees] Target path: %s" target-path)
+  (when vibemacs-worktrees-setup-verbose-logging
+    (message "[worktrees] Starting setup for worktree: %s" name)
+    (message "[worktrees] Root worktree: %s" repo)
+    (message "[worktrees] Target path: %s" target-path))
   (let* ((config (vibemacs-worktrees--read-setup-config repo target-path))
          (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
-    (message "[worktrees] Config object: %S" config)
-    (when config
-      (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
-    (message "[worktrees] Commands lookup result: %S" commands)
-    (message "[worktrees] Commands type: %s" (type-of commands))
-    (message "[worktrees] Commands is list: %s" (listp commands))
-    (message "[worktrees] Commands length: %s" (when commands (length commands)))
+    (when vibemacs-worktrees-setup-verbose-logging
+      (message "[worktrees] Config object: %S" config)
+      (when config
+        (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
+      (message "[worktrees] Commands lookup result: %S" commands)
+      (message "[worktrees] Commands type: %s" (type-of commands))
+      (message "[worktrees] Commands is list: %s" (listp commands))
+      (message "[worktrees] Commands length: %s" (when commands (length commands))))
     (if (and commands (listp commands) (> (length commands) 0))
         (progn
-          (message "[worktrees] Found %d setup command(s)" (length commands))
+          (when vibemacs-worktrees-setup-verbose-logging
+            (message "[worktrees] Found %d setup command(s)" (length commands)))
           ;; Start running commands sequentially
           (vibemacs-worktrees--run-setup-command commands target-path repo name 0 on-success on-failure))
       (progn
