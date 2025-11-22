@@ -81,6 +81,10 @@ This allows newlines to be preserved without executing the command."
 
 ;;; Chat Buffer Management
 
+(defun vibemacs-worktrees--chat-buffer-name (entry assistant)
+  "Return buffer name for ENTRY and ASSISTANT like *worktree-assistant*."
+  (format "*%s-%s*" (vibemacs-worktrees--entry-name entry) assistant))
+
 (defun vibemacs-worktrees--chat-buffer (entry)
   "Ensure the assistant chat console for ENTRY exists and return it."
   (unless entry
@@ -88,9 +92,9 @@ This allows newlines to be preserved without executing the command."
   (vibemacs-worktrees--ensure-vterm)
   (let* ((name (vibemacs-worktrees--entry-name entry))
          (root (vibemacs-worktrees--entry-root entry))
-         (buffer-name (format "*vibemacs Chat %s*" name))
          (metadata (vibemacs-worktrees--load-metadata entry))
          (assistant (vibemacs-worktrees--metadata-assistant metadata))
+         (buffer-name (vibemacs-worktrees--chat-buffer-name entry assistant))
          (command (vibemacs-worktrees--assistant-command assistant)))
     (when (or (null command) (string-empty-p command))
       (user-error "No assistant command configured for %s" name))
@@ -126,11 +130,13 @@ ASSISTANT is the identifier configured for the chat session."
             (setq-local header-line-format nil)
             (setq-local vibemacs-worktrees--chat-command-started nil)
             (setq-local vibemacs-worktrees--chat-program command)
-            (setq-local vibemacs-worktrees--chat-assistant assistant)))))
+            (setq-local vibemacs-worktrees--chat-assistant assistant)
+            (setq-local vibemacs-worktrees--buffer-role 'chat)))))
     (when buffer
       (with-current-buffer buffer
         (setq-local vibemacs-worktrees--chat-program command)
         (setq-local vibemacs-worktrees--chat-assistant assistant)
+        (setq-local vibemacs-worktrees--buffer-role 'chat)
         ;; Store the worktree root for tab scoping
         (setq-local vibemacs-worktrees--buffer-root root)
         ;; Configure tab-line for worktree chat buffers
@@ -158,8 +164,8 @@ Returns the first live chat/agent buffer found, or nil if none exist."
        (lambda (buf)
          (and (buffer-live-p buf)
               (with-current-buffer buf
-                (and (or (string-match-p "\\*vibemacs Agent" (buffer-name))
-                        (string-match-p "\\*vibemacs Chat" (buffer-name)))
+                (and (boundp 'vibemacs-worktrees--buffer-role)
+                     (memq vibemacs-worktrees--buffer-role '(agent chat))
                      (boundp 'vibemacs-worktrees--buffer-root)
                      vibemacs-worktrees--buffer-root
                      (string= (expand-file-name vibemacs-worktrees--buffer-root)
@@ -173,8 +179,8 @@ Returns the created buffer."
   (vibemacs-worktrees--ensure-vterm)
   (let* ((current-root (vibemacs-worktrees--entry-root entry))
          (command (vibemacs-worktrees--assistant-command agent))
-         ;; Generate unique buffer name
-         (base-name (format "*vibemacs Agent %s*" agent))
+         ;; Generate buffer name scoped by worktree and agent
+         (base-name (vibemacs-worktrees--chat-buffer-name entry agent))
          (buffer-name (generate-new-buffer-name base-name))
          (default-directory (or current-root default-directory "~")))
     (when (or (null command) (string-empty-p command))
@@ -192,6 +198,7 @@ Returns the created buffer."
             (setq-local vibemacs-worktrees--chat-program command)
             (setq-local vibemacs-worktrees--chat-assistant agent)
             (setq-local vibemacs-worktrees--chat-command-started nil)
+            (setq-local vibemacs-worktrees--buffer-role 'agent)
             ;; Store the worktree root for tab scoping
             (setq-local vibemacs-worktrees--buffer-root current-root)
             ;; Launch the agent command
@@ -206,6 +213,7 @@ Returns the created buffer."
       (when buffer
         (with-current-buffer buffer
           (setq-local tab-line-tabs-function 'vibemacs-worktrees--agent-tab-line-tabs)
+          (setq-local vibemacs-worktrees--buffer-role 'agent)
           (tab-line-mode 1)))
       ;; Optionally display the buffer in the center window
       (when buffer
@@ -281,21 +289,21 @@ Order is persisted per worktree so it survives buffer switches and reflows."
          (lambda (buf)
            (and (buffer-live-p buf)
                 (with-current-buffer buf
-                  (cond
-                   ;; Files scoped by root.
-                   ((buffer-file-name)
-                    (or (not current-root)
-                        (let ((file-path (expand-file-name (buffer-file-name)))
-                              (root-path (file-name-as-directory (expand-file-name current-root))))
-                          (string-prefix-p root-path file-path))))
-                   ;; Agent/chat buffers scoped by stored buffer root.
-                   ((or (string-match-p "\\*vibemacs Agent" (buffer-name))
-                        (string-match-p "\\*vibemacs Chat" (buffer-name)))
-                    (or (not current-root)
-                        (and (boundp 'vibemacs-worktrees--buffer-root)
-                             vibemacs-worktrees--buffer-root
-                             (string= (expand-file-name vibemacs-worktrees--buffer-root)
-                                     (expand-file-name current-root)))))
+                 (cond
+                  ;; Files scoped by root.
+                  ((buffer-file-name)
+                   (or (not current-root)
+                       (let ((file-path (expand-file-name (buffer-file-name)))
+                             (root-path (file-name-as-directory (expand-file-name current-root))))
+                         (string-prefix-p root-path file-path))))
+                  ;; Agent/chat buffers scoped by stored buffer root.
+                  ((and (boundp 'vibemacs-worktrees--buffer-role)
+                        (memq vibemacs-worktrees--buffer-role '(agent chat)))
+                   (or (not current-root)
+                       (and (boundp 'vibemacs-worktrees--buffer-root)
+                            vibemacs-worktrees--buffer-root
+                            (string= (expand-file-name vibemacs-worktrees--buffer-root)
+                                    (expand-file-name current-root)))))
                    (t nil)))))
          tab-order)))))
 

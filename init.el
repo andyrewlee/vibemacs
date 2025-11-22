@@ -108,8 +108,16 @@ Returns non-nil on success, nil on failure."
       require-final-newline t
       use-short-answers t)
 ;; Enable tab-line mode only for file buffers (not special buffers)
+(defun vibemacs-tab-line--name (buffer &optional _buffers)
+  "Return a concise tab label for BUFFER.
+Strips leading/trailing * from special buffers to keep names short."
+  (let* ((raw (buffer-name buffer))
+         (trimmed (string-trim raw "\\*" "\\*")))
+    trimmed))
+
 (setq tab-line-close-button-show nil  ;; Hide close buttons for cleaner look
-      tab-line-new-button-show nil)   ;; Hide new tab button
+      tab-line-new-button-show nil    ;; Hide new tab button
+      tab-line-tab-name-function #'vibemacs-tab-line--name)
 (add-hook 'find-file-hook 'tab-line-mode)
 (setq-default indent-tabs-mode nil tab-width 2)
 (save-place-mode 1)
@@ -138,8 +146,8 @@ Falls back to default evil-quit for special buffers."
   (if (and (bound-and-true-p tab-line-mode)
            (or (buffer-file-name)
                ;; Also handle agent and chat buffers
-               (string-match-p "\\*vibemacs Agent" (buffer-name))
-               (string-match-p "\\*vibemacs Chat" (buffer-name))
+               (and (boundp 'vibemacs-worktrees--buffer-role)
+                    (memq vibemacs-worktrees--buffer-role '(agent chat)))
                (derived-mode-p 'vterm-mode)))
       ;; If tab-line is active and we're in a file, agent, or chat buffer, just kill the buffer
       (kill-buffer)

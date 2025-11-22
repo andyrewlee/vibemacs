@@ -256,8 +256,8 @@ When ENTRY is nil, reuse the currently active worktree."
           (with-selected-window window
             (when (buffer-live-p (current-buffer))
               (let ((buf-name (buffer-name (current-buffer))))
-                (when (or (string-match-p "\\*vibemacs Agent" buf-name)
-                          (string-match-p "\\*vibemacs Chat" buf-name))
+                (when (and (boundp 'vibemacs-worktrees--buffer-role)
+                           (memq vibemacs-worktrees--buffer-role '(agent chat)))
                   (vibemacs-worktrees--save-last-active-buffer
                    previous-entry
                    buf-name))))))
@@ -289,8 +289,9 @@ When ENTRY is nil, reuse the currently active worktree."
                  (last-buffer (and last-buffer-name (get-buffer last-buffer-name)))
                  ;; Check if last buffer is still valid (exists and is a chat/agent buffer)
                  (last-buffer-valid (and (buffer-live-p last-buffer)
-                                         (or (string-match-p "\\*vibemacs Agent" last-buffer-name)
-                                             (string-match-p "\\*vibemacs Chat" last-buffer-name))))
+                                         (with-current-buffer last-buffer
+                                           (and (boundp 'vibemacs-worktrees--buffer-role)
+                                                (memq vibemacs-worktrees--buffer-role '(agent chat))))))
                  (buffer (if last-buffer-valid
                              last-buffer
                            ;; Check if any chat/agent tabs exist, otherwise use configured assistant
