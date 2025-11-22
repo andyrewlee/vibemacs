@@ -31,6 +31,12 @@
 (defvar vibemacs-worktrees--explicit-tab-lists (make-hash-table :test 'equal)
   "Per-worktree mapping of explicit tab buffers used in the center pane.")
 
+(defcustom vibemacs-worktrees-terminal-max-scrollback 4000
+  "Maximum scrollback lines for worktree terminal buffers.
+Lower this if noisy logs cause UI jank; increase if you need more history."
+  :group 'vibemacs-worktrees
+  :type 'integer)
+
 ;;; Layout helpers
 
 (defun vibemacs-worktrees--desired-widths (frame-width)
@@ -159,6 +165,7 @@ Returns plist with :mode and window roles (:dashboard :chat :git-status :termina
         (let ((vterm-buffer-name buffer-name))
           (with-current-buffer (vterm)
             (setq-local header-line-format nil)
+            (setq-local vterm-max-scrollback vibemacs-worktrees-terminal-max-scrollback)
             (current-buffer)))))))
 
 (defun vibemacs-worktrees-update-right-terminal (&optional entry)

@@ -8,12 +8,20 @@
 
 (require 'worktrees-core)
 (require 'filenotify)
+(require 'cl-lib)
+(require 'subr-x)
 (eval-when-compile (require 'evil))
 
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 (defvar vibemacs-worktrees--center-window)
 
 ;;; Git Status Sidebar
+
+(defvar vibemacs-worktrees-git-status--process nil
+  "Live git status refresh process, if any.")
+
+(defvar vibemacs-worktrees-git-status--process-root nil
+  "Repository root for the active git status process.")
 
 (defvar vibemacs-worktrees-git-status-buffer "*vibemacs-git*"
   "Buffer name for the vibemacs git status sidebar.")
@@ -71,39 +79,38 @@
     (vibemacs-worktrees-git-status--populate entry)
     (vibemacs-worktrees-git-status--start-auto-refresh)))
 
-;;;###autoload
-(defun vibemacs-worktrees-git-status--populate (entry)
-  "Populate the git status sidebar with changed files for ENTRY."
-  (let* ((root (vibemacs-worktrees--entry-root entry))
-         (status-list
-          (when (file-directory-p root)
-            (let ((default-directory root))
-              (with-temp-buffer
-                (when (zerop (process-file "git" nil (current-buffer) nil
-                                           "status" "--short" "--untracked-files"))
-                  (goto-char (point-min))
-                  (let (results)
-                    (while (not (eobp))
-                      (let ((line (buffer-substring-no-properties (point) (line-end-position))))
-                        (when (>= (length line) 3)
-                          (let ((code (string-trim (substring line 0 2)))
-                                (path (string-trim (substring line 3))))
-                            (when (string-match "\\(.*\\) -> \\(.*\\)" path)
-                              (setq path (match-string 2 path)))
-                            (push (cons code path) results))))
-                      (forward-line 1))
-                    (nreverse results)))))))
-         (buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
+(defun vibemacs-worktrees-git-status--parse (output)
+  "Parse git status OUTPUT into an alist of (CODE . PATH)."
+  (let (results)
+    (dolist (line (split-string output "\n" t))
+      (when (>= (length line) 3)
+        (let ((code (string-trim (substring line 0 2)))
+              (path (string-trim (substring line 3))))
+          (when (string-match "\\(.*\\) -> \\(.*\\)" path)
+            (setq path (match-string 2 path)))
+          (push (cons code path) results))))
+    (nreverse results)))
+
+(defun vibemacs-worktrees-git-status--render (entry status-list &optional refreshing message)
+  "Render STATUS-LIST for ENTRY into the git status sidebar buffer.
+When REFRESHING is non-nil, show a loading message instead of git output.
+When MESSAGE is provided, display it instead of git status contents."
+  (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
     (with-current-buffer buffer
       (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
         (vibemacs-worktrees-git-status-mode))
       (let ((inhibit-read-only t))
         (erase-buffer)
-        (insert (propertize "Git Status\n" 'face 'bold))
+         (insert (propertize "Git Status\n" 'face 'bold))
         (insert (propertize (format "%s\n" (vibemacs-worktrees--entry-name entry))
                             'face 'font-lock-comment-face))
         (insert (propertize "──────────────────────\n" 'face 'shadow))
-        (if status-list
+        (cond
+         (message
+          (insert (propertize (concat message "\n") 'face 'font-lock-warning-face)))
+         (refreshing
+          (insert (propertize "Refreshing…\n" 'face 'font-lock-comment-face)))
+         (status-list
             (dolist (status status-list)
               (pcase-let ((`(,code . ,path) status))
                 (let* ((status-face (cond
@@ -124,11 +131,90 @@
                                       'help-echo "RET to open file"))
                   (insert "\n")
                   ;; Add vibemacs-file-path property to entire line
-                  (put-text-property line-start (1- (point)) 'vibemacs-file-path path))))
-          (insert (propertize "Working tree clean\n" 'face 'success)))
+                  (put-text-property line-start (1- (point)) 'vibemacs-file-path path)))))
+         (t
+          (insert (propertize "Working tree clean\n" 'face 'success))))
         (goto-char (point-min))
         (forward-line 3)))
     buffer))
+
+(defun vibemacs-worktrees-git-status--sentinel (proc event)
+  "Sentinel for git status refresh PROC.  EVENT is the process change string."
+  (when (memq (process-status proc) '(exit signal))
+    (let* ((is-current (eq proc vibemacs-worktrees-git-status--process))
+           (output (when (and is-current
+                              (eq (process-status proc) 'exit)
+                              (zerop (process-exit-status proc)))
+                     (when-let ((buf (process-buffer proc)))
+                       (with-current-buffer buf
+                         (buffer-string)))))
+           (entry (process-get proc 'entry))
+           (root (process-get proc 'root)))
+      (when (buffer-live-p (process-buffer proc))
+        (kill-buffer (process-buffer proc)))
+      (when is-current
+        (cond
+         ((and entry output)
+          (vibemacs-worktrees-git-status--render entry
+                                                 (vibemacs-worktrees-git-status--parse output)))
+         (entry
+          (vibemacs-worktrees-git-status--render
+           entry nil nil
+           (format "git status failed%s"
+                   (if root (format " for %s" root) "")))
+          (message "vibemacs: git status failed for %s (%s)"
+                   (or root "unknown repo") (string-trim event)))))
+      (when is-current
+        (setq vibemacs-worktrees-git-status--process nil
+              vibemacs-worktrees-git-status--process-root nil)))))
+
+;;;###autoload
+(defun vibemacs-worktrees-git-status--populate (entry)
+  "Populate the git status sidebar with changed files for ENTRY."
+  (let* ((root (vibemacs-worktrees--entry-root entry)))
+    ;; Always cancel any in-flight process unless it's already for this root.
+    (when (process-live-p vibemacs-worktrees-git-status--process)
+      (unless (and root
+                   vibemacs-worktrees-git-status--process-root
+                   (string= vibemacs-worktrees-git-status--process-root root))
+        (ignore-errors (kill-process vibemacs-worktrees-git-status--process))))
+
+    ;; If a process is still running for the same root, let it finish.
+    (when (and (process-live-p vibemacs-worktrees-git-status--process)
+               root
+               vibemacs-worktrees-git-status--process-root
+               (string= vibemacs-worktrees-git-status--process-root root))
+      (cl-return-from vibemacs-worktrees-git-status--populate))
+
+    ;; Reset cached process state after cancellations or for missing roots.
+    (setq vibemacs-worktrees-git-status--process nil
+          vibemacs-worktrees-git-status--process-root nil)
+
+    (if (not (and root (file-directory-p root)))
+        (vibemacs-worktrees-git-status--render
+         entry nil nil
+         (if root
+             (format "Worktree directory missing: %s" root)
+           "Worktree directory missing"))
+
+      (setq vibemacs-worktrees-git-status--process-root root)
+
+      ;; Kick off async git status; avoid blocking the UI on large repos.
+      (let* ((temp-buffer (generate-new-buffer " *vibemacs-git-status*"))
+             (proc (let ((default-directory root))
+                     (make-process
+                      :name "vibemacs-git-status"
+                      :buffer temp-buffer
+                      :command '("git" "status" "--short" "--untracked-files")
+                      :noquery t
+                      :connection-type 'pipe
+                      :sentinel #'vibemacs-worktrees-git-status--sentinel))))
+        (process-put proc 'entry entry)
+        (process-put proc 'root root)
+        (setq vibemacs-worktrees-git-status--process proc))
+
+      ;; Show placeholder while the async process runs.
+      (vibemacs-worktrees-git-status--render entry nil t))))
 
 ;;; Git Status Auto-Refresh
 
