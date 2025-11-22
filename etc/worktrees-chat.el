@@ -80,6 +80,10 @@ This allows newlines to be preserved without executing the command."
       (message "vibemacs: chat/terminal process is not active")))
 
 ;;; Chat Buffer Management
+;; In this module “chat” buffers are just agent buffers. The “chat” entry
+;; point launches the default assistant for a worktree when none exists, but
+;; otherwise reuses the same vterm agent buffers. Naming is unified so agent
+;; tabs and chat tabs are the same kind of buffer.
 
 (defun vibemacs-worktrees--chat-buffer-name (entry assistant)
   "Return buffer name for ENTRY and ASSISTANT like *worktree-assistant*."
