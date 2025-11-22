@@ -395,6 +395,29 @@ prompt to the current buffer."
         (vterm-send-return))
       (message "Sent plan creation request for plans/%s.md" file-name))))
 
+(defun vibemacs-worktrees-create-handoff ()
+  "Create a handoff summary for the next agent.
+Prompts for a file name, then asks the AI agent to write a concise
+handoff markdown file."
+  (interactive)
+  (unless (derived-mode-p 'vterm-mode)
+    (user-error "This command must be run from a chat or agent buffer"))
+  (let ((vterm-buffer (current-buffer))
+        (file-name (read-string "Handoff file name (e.g., refactor-handoff): ")))
+    (when (string-empty-p file-name)
+      (user-error "File name cannot be empty"))
+    (let* ((template (vibemacs-worktrees--load-prompt-template "handoff.md"))
+           (raw-prompt (if template
+                           (vibemacs-worktrees--substitute-prompt-vars
+                            template
+                            `(("file_name" . ,file-name)))
+                         (format "Create a concise handoff summary markdown file at handoffs/%s.md. Capture current context, decisions made, open questions, risks, next steps, key files/branches, and commands to rerun. Keep it scannable so the next coding agent can resume quickly." file-name)))
+           (prompt (vibemacs-worktrees--format-prompt raw-prompt)))
+      (with-current-buffer vterm-buffer
+        (vibemacs-worktrees--send-multiline-to-vterm prompt)
+        (vterm-send-return))
+      (message "Sent handoff request for handoffs/%s.md" file-name))))
+
 ;; Set up keybindings
 (with-eval-after-load 'vterm
   (define-key vterm-mode-map (kbd "C-c C-c") #'vibemacs-worktrees-chat-send-interrupt))
