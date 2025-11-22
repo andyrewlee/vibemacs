@@ -75,7 +75,12 @@ However, if ROOT matches a registered project path, unregister the project."
 (defun vibemacs-worktrees--project-from-path (path)
   "Construct a project struct for PATH by scanning git worktrees."
   (let* ((expanded-path (expand-file-name path))
-         (records (vibemacs-worktrees--discover-git-worktrees expanded-path))
+         (records (cl-remove-if
+                   (lambda (record)
+                     (string=
+                      (directory-file-name (expand-file-name (plist-get record :path)))
+                      (directory-file-name expanded-path)))
+                   (vibemacs-worktrees--discover-git-worktrees expanded-path)))
          (worktrees (mapcar (lambda (record)
                               (let ((entry (vibemacs-worktrees--entry-from-record expanded-path record)))
                                 (vibemacs-worktrees--maybe-init-metadata entry)
@@ -91,20 +96,10 @@ However, if ROOT matches a registered project path, unregister the project."
   (let ((paths (vibemacs-worktrees--load-registry)))
     (delq nil (mapcar #'vibemacs-worktrees--project-from-path paths))))
 
-(defun vibemacs-worktrees--promote-main-entry (project)
-  "Return PROJECT's worktrees with the primary checkout first.
-Primary is the entry whose root matches the project path; order of the rest is preserved."
-  (let* ((path (vibemacs-project-path project))
-         (all (copy-sequence (vibemacs-project-worktrees project)))
-         (primary (cl-find path all :test #'string= :key #'vibemacs-worktrees--entry-root)))
-    (if (not primary)
-        all
-      (cons primary (cl-remove primary all :test #'eq)))))
-
 (defun vibemacs-worktrees--entries ()
-  "Return all registered worktree entries across all projects, primary first per project."
+  "Return all registered worktree entries across all projects."
   (let ((projects (vibemacs-worktrees--projects)))
-    (mapcan #'vibemacs-worktrees--promote-main-entry projects)))
+    (apply #'append (mapcar #'vibemacs-project-worktrees projects))))
 
 (defun vibemacs-worktrees--entries-safe ()
   "Return registered worktree entries, or an empty list when none exist."
