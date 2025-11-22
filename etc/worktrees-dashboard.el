@@ -224,9 +224,9 @@ HELP overrides the default hover tooltip."
     (list `(:create . ,project) (vector label))))
 
 (defun vibemacs-worktrees-dashboard--home-entry ()
-  "Return the Home row that restores the welcome screen."
+  "Return the vibemacs row that restores the welcome screen."
   (let ((label (vibemacs-worktrees-dashboard--format-cell
-                "Home"
+                "vibemacs"
                 '(:weight bold)
                 nil
                 "Press RET to return to the welcome screen")))
