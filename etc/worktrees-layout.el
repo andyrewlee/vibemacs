@@ -548,6 +548,9 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
        (if (window-live-p dashboard-window)
            (select-window dashboard-window)
          (select-window chat-window))
+       ;; Refresh cursor to match current buffer's Evil state
+       (when (fboundp 'evil-refresh-cursor)
+         (evil-refresh-cursor))
        (when (and (window-live-p dashboard-window)
                   (eq (window-buffer dashboard-window) dashboard-buffer))
          (when dashboard-start (set-window-start dashboard-window dashboard-start t))
@@ -581,6 +584,9 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
         (if (window-live-p dashboard-window)
             (select-window dashboard-window)
           (select-window chat-window))
+        ;; Refresh cursor to match current buffer's Evil state
+        (when (fboundp 'evil-refresh-cursor)
+          (evil-refresh-cursor))
         (when (and (window-live-p dashboard-window)
                    (eq (window-buffer dashboard-window) dashboard-buffer))
           (when dashboard-start (set-window-start dashboard-window dashboard-start t))

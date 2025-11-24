@@ -132,7 +132,9 @@ Strips leading/trailing * from special buffers to keep names short."
   :init
   (setq evil-want-C-u-scroll t
         evil-shift-width 2
-        evil-want-keybinding nil)
+        evil-want-keybinding nil
+        evil-normal-state-cursor '(box "#61afef")
+        evil-insert-state-cursor '(bar "pink"))
   :config
   ;; enable globally
   (evil-mode 1)
