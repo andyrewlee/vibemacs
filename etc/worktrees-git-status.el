@@ -23,6 +23,14 @@
 (defvar vibemacs-worktrees-git-status--process-root nil
   "Repository root for the active git status process.")
 
+(defvar vibemacs-worktrees-git-status--last-render nil
+  "Plist describing the last rendered git status.
+Keys:
+- :root: repository root for the render
+- :status: last status list passed to `vibemacs-worktrees-git-status--render'
+- :message: optional message shown instead of status
+- :buffer: buffer that was rendered into.")
+
 (defvar vibemacs-worktrees-git-status-buffer "*vibemacs-git*"
   "Buffer name for the vibemacs git status sidebar.")
 
@@ -53,7 +61,11 @@
     (with-current-buffer buffer
       (vibemacs-worktrees-git-status-mode)
       ;; Stop auto-refresh when buffer is killed
-      (add-hook 'kill-buffer-hook #'vibemacs-worktrees-git-status--stop-auto-refresh nil t))
+      (add-hook 'kill-buffer-hook #'vibemacs-worktrees-git-status--stop-auto-refresh nil t)
+      ;; Clear cached render when the buffer is gone so reopening repaints.
+      (add-hook 'kill-buffer-hook
+                (lambda () (setq vibemacs-worktrees-git-status--last-render nil))
+                nil t))
     buffer))
 
 (declare-function vibemacs-worktrees--add-to-tabs "worktrees-layout")
@@ -95,10 +107,24 @@
   "Render STATUS-LIST for ENTRY into the git status sidebar buffer.
 When REFRESHING is non-nil, show a loading message instead of git output.
 When MESSAGE is provided, display it instead of git status contents."
-  (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
-    (with-current-buffer buffer
-      (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
-        (vibemacs-worktrees-git-status-mode))
+  (let* ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer))
+         (root (vibemacs-worktrees--entry-root entry))
+         (cached vibemacs-worktrees-git-status--last-render)
+         (same-buffer (and cached
+                           (buffer-live-p (plist-get cached :buffer))
+                           (eq buffer (plist-get cached :buffer)))))
+    ;; Skip re-render when content has not changed; reduces visible flicker.
+    (unless (and (not refreshing)
+                 cached
+                 root
+                 (plist-get cached :root)
+                 (string= root (plist-get cached :root))
+                 same-buffer
+                 (equal status-list (plist-get cached :status))
+                 (equal message (plist-get cached :message)))
+      (with-current-buffer buffer
+        (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
+          (vibemacs-worktrees-git-status-mode))
       (let ((inhibit-read-only t))
         (erase-buffer)
          (insert (propertize "Git Status\n" 'face 'bold))
@@ -136,6 +162,14 @@ When MESSAGE is provided, display it instead of git status contents."
           (insert (propertize "Working tree clean\n" 'face 'success))))
         (goto-char (point-min))
         (forward-line 3)))
+      ;; Cache the rendered state so subsequent refreshes can skip
+      ;; rewriting identical content (helps prevent flicker).
+      (unless refreshing
+        (setq vibemacs-worktrees-git-status--last-render
+              (list :root root
+                    :buffer buffer
+                    :status status-list
+                    :message message))))
     buffer))
 
 (defun vibemacs-worktrees-git-status--sentinel (proc event)
@@ -172,6 +206,13 @@ When MESSAGE is provided, display it instead of git status contents."
 (defun vibemacs-worktrees-git-status--populate (entry)
   "Populate the git status sidebar with changed files for ENTRY."
   (let* ((root (vibemacs-worktrees--entry-root entry)))
+    ;; Reset cache when switching to a different worktree.
+    (unless (and vibemacs-worktrees-git-status--last-render
+                 root
+                 (plist-get vibemacs-worktrees-git-status--last-render :root)
+                 (string= root (plist-get vibemacs-worktrees-git-status--last-render :root)))
+      (setq vibemacs-worktrees-git-status--last-render nil))
+
     ;; Always cancel any in-flight process unless it's already for this root.
     (when (process-live-p vibemacs-worktrees-git-status--process)
       (unless (and root
@@ -214,7 +255,8 @@ When MESSAGE is provided, display it instead of git status contents."
         (setq vibemacs-worktrees-git-status--process proc))
 
       ;; Show placeholder while the async process runs.
-      (vibemacs-worktrees-git-status--render entry nil t))))
+      (unless vibemacs-worktrees-git-status--last-render
+        (vibemacs-worktrees-git-status--render entry nil t)))))
 
 ;;; Git Status Auto-Refresh
 
