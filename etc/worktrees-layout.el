@@ -505,6 +505,12 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
     (set-window-parameter win 'window-preserved-size nil))
   (let* ((root-window (selected-window))
          (dashboard-buffer (vibemacs-worktrees-dashboard--setup-buffer))
+         (existing-dashboard-window (get-buffer-window dashboard-buffer t))
+         (dashboard-point (and (window-live-p existing-dashboard-window)
+                               (with-selected-window existing-dashboard-window
+                                 (point))))
+         (dashboard-start (and (window-live-p existing-dashboard-window)
+                               (window-start existing-dashboard-window)))
          (git-status-buffer (vibemacs-worktrees-git-status--setup-buffer))
          (frame-width (window-total-width root-window))
          (widths (vibemacs-worktrees--desired-widths frame-width))
@@ -517,6 +523,12 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
               (git-status-window (plist-get layout :git-status))
               (terminal-window (plist-get layout :terminal)))
          (vibemacs-worktrees--set-window-roles dashboard-window chat-window git-status-window terminal-window widths)
+         (when (and (window-live-p dashboard-window)
+                    (eq (window-buffer dashboard-window) dashboard-buffer))
+           (when dashboard-start (set-window-start dashboard-window dashboard-start t))
+           (when dashboard-point
+             (set-window-point dashboard-window (min (with-current-buffer dashboard-buffer (point-max))
+                                                     dashboard-point))))
          (when entry
            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
            (vibemacs-worktrees-dashboard--activate entry)
@@ -532,12 +544,26 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
                          (error-message-string err)))))
            (vibemacs-worktrees-git-status--populate entry)
            (vibemacs-worktrees-git-status--start-auto-refresh))
-         (setq vibemacs-worktrees--startup-applied t)
-         (select-window chat-window)))
+       (setq vibemacs-worktrees--startup-applied t)
+       (if (window-live-p dashboard-window)
+           (select-window dashboard-window)
+         (select-window chat-window))
+       (when (and (window-live-p dashboard-window)
+                  (eq (window-buffer dashboard-window) dashboard-buffer))
+         (when dashboard-start (set-window-start dashboard-window dashboard-start t))
+         (when dashboard-point
+           (set-window-point dashboard-window (min (with-current-buffer dashboard-buffer (point-max))
+                                                   dashboard-point))))))
       ('two
        (let ((dashboard-window (plist-get layout :dashboard))
              (chat-window (plist-get layout :chat)))
          (vibemacs-worktrees--set-window-roles dashboard-window chat-window nil nil widths)
+         (when (and (window-live-p dashboard-window)
+                    (eq (window-buffer dashboard-window) dashboard-buffer))
+           (when dashboard-start (set-window-start dashboard-window dashboard-start t))
+           (when dashboard-point
+             (set-window-point dashboard-window (min (with-current-buffer dashboard-buffer (point-max))
+                                                     dashboard-point))))
          (when entry
            (setq vibemacs-worktrees--active-root (vibemacs-worktrees--entry-root entry))
            (vibemacs-worktrees-dashboard--activate entry)
@@ -551,14 +577,28 @@ With FORCE (interactive prefix), rebuild the layout even if it was already appli
                (error
                 (message "vibemacs: unable to open chat console (%s)"
                          (error-message-string err))))))
-         (setq vibemacs-worktrees--startup-applied t)
-         (select-window chat-window)
-         (message "vibemacs: frame width %d < three-column minimum; showing two-column layout." frame-width)))
+        (setq vibemacs-worktrees--startup-applied t)
+        (if (window-live-p dashboard-window)
+            (select-window dashboard-window)
+          (select-window chat-window))
+        (when (and (window-live-p dashboard-window)
+                   (eq (window-buffer dashboard-window) dashboard-buffer))
+          (when dashboard-start (set-window-start dashboard-window dashboard-start t))
+          (when dashboard-point
+            (set-window-point dashboard-window (min (with-current-buffer dashboard-buffer (point-max))
+                                                    dashboard-point))))
+        (message "vibemacs: frame width %d < three-column minimum; showing two-column layout." frame-width)))
       (_
        (let ((dashboard-window (plist-get layout :dashboard)))
          (setq vibemacs-worktrees--center-window nil)
          (setq vibemacs-worktrees--right-window nil)
          (vibemacs-worktrees--set-window-roles dashboard-window nil nil nil widths)
+         (when (and (window-live-p dashboard-window)
+                    (eq (window-buffer dashboard-window) dashboard-buffer))
+           (when dashboard-start (set-window-start dashboard-window dashboard-start t))
+           (when dashboard-point
+             (set-window-point dashboard-window (min (with-current-buffer dashboard-buffer (point-max))
+                                                     dashboard-point))))
          (setq vibemacs-worktrees--startup-applied t)
          (message "vibemacs: frame width %d too small for multi-column; showing dashboard only." frame-width))))))
 

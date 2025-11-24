@@ -390,14 +390,32 @@ HELP overrides the default hover tooltip."
   (setq tabulated-list-entries (vibemacs-worktrees-dashboard--entries)))
 
 (defun vibemacs-worktrees-dashboard--rebuild ()
-  "Regenerate and display dashboard entries."
-  (let ((target vibemacs-worktrees--active-root))
+  "Regenerate and display dashboard entries while preserving cursor/scroll."
+  (let* ((win (get-buffer-window (current-buffer) t))
+         (saved-start (and (window-live-p win) (window-start win)))
+         (saved-id (if (window-live-p win)
+                       (with-selected-window win (tabulated-list-get-id))
+                     (tabulated-list-get-id)))
+         (saved-point (if (window-live-p win)
+                          (with-selected-window win (point))
+                        (point)))
+         (target (or (and (stringp saved-id) saved-id)
+                     vibemacs-worktrees--active-root)))
     (vibemacs-worktrees-dashboard--refresh)
-    (tabulated-list-print t)
-    (when target
-      (ignore-errors (tabulated-list-goto-id target))
-      (when (derived-mode-p 'hl-line-mode)
-        (hl-line-highlight)))))
+    (let ((inhibit-redisplay t))
+      (tabulated-list-print t))
+    (cond
+     ((and target (ignore-errors (tabulated-list-goto-id target))))
+     ((<= saved-point (point-max))
+      (goto-char saved-point))
+     (t (goto-char (point-max))))
+    (let ((pt (point)))
+      (when (and (window-live-p win) (eq (window-buffer win) (current-buffer)))
+        (set-window-point win pt)
+        (when saved-start
+          (set-window-start win saved-start t))))
+    (when (derived-mode-p 'hl-line-mode)
+      (hl-line-highlight))))
 
 (defun vibemacs-worktrees-dashboard--setup-buffer ()
   "Ensure the dashboard buffer exists and is populated, returning it."
