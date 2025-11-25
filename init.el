@@ -100,6 +100,7 @@ Returns non-nil on success, nil on failure."
 (when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
 (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
 (blink-cursor-mode -1)
+(setq-default cursor-in-non-selected-windows nil) ;; show cursor only in active window
 (global-display-line-numbers-mode -1)
 (when (fboundp 'pixel-scroll-precision-mode)
   (pixel-scroll-precision-mode 1))
