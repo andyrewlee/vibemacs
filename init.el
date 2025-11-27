@@ -349,6 +349,11 @@ Falls back to default evil-quit for special buffers."
   :init
   (setq multi-vterm-buffer-name "codex"))
 
+;; Anti-flicker filter for vterm (helps with Claude Code and other TUI apps)
+(use-package vterm-anti-flicker-filter
+  :after vterm
+  :vc (:fetcher github :repo martinbaillie/vterm-anti-flicker-filter))
+
 ;;; prose polish
 ;;; Aesthetics for writing prose (used in Markdown).
 (use-package visual-fill-column
