@@ -177,11 +177,9 @@ If ENTRY is nil prompt the user."
   "Open the metadata file for ENTRY in a buffer for editing."
   (interactive)
   (let* ((entry (or entry (vibemacs-worktrees--select-entry "Edit config for worktree: ")))
-         (path (rassoc nil (list (cons 'metadata-path (vibemacs-worktrees--metadata-path entry))))))
-    (unless path
-      (vibemacs-worktrees--save-metadata entry
-                                         (vibemacs-worktrees--default-metadata entry)))
-    (find-file (cdr (assoc 'metadata-path path)))))
+         (path (vibemacs-worktrees--metadata-path entry)))
+    (vibemacs-worktrees--maybe-init-metadata entry)
+    (find-file path)))
 
 ;;; Worktree Setup Commands
 
