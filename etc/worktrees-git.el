@@ -27,7 +27,8 @@ Signals an error if the command exits with non-zero."
                  (buffer-string)))))))
 
 (defun vibemacs-worktrees--git-root (&optional directory)
-  "Return the toplevel git directory for DIRECTORY (defaults to `default-directory')."
+  "Return the toplevel git directory for DIRECTORY.
+Defaults to `default-directory'."
   (let ((dir (expand-file-name (or directory default-directory))))
     (condition-case nil
         (vibemacs-worktrees--call-git dir "rev-parse" "--show-toplevel")

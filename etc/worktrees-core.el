@@ -188,7 +188,7 @@ When set to `none', stay within the diff buffer that is already shown."
 ;;; Buffer-local Variables
 
 (defvar-local vibemacs-worktrees--chat-command-started nil
-  "Non-nil when the vibemacs chat console has already launched the assistant command.")
+  "Non-nil when the chat console has already launched the assistant.")
 
 (defvar-local vibemacs-worktrees--chat-program nil
   "Command used to start the assistant in the current chat buffer.")
@@ -214,8 +214,8 @@ When set to `none', stay within the diff buffer that is already shown."
     (make-directory vibemacs-worktrees-root t)))
 
 (defun vibemacs-worktrees--default-target-directory (repo name)
-  "Return the directory path where a new worktree NAME should live.
-The worktree will be placed under `vibemacs-worktrees-root', grouped by repository name."
+  "Return directory path for new worktree NAME.
+Placed under `vibemacs-worktrees-root', grouped by repository name."
   (vibemacs-worktrees--ensure-root)
   (let* ((normalized (directory-file-name (expand-file-name repo)))
          (repo-name (file-name-nondirectory normalized)))

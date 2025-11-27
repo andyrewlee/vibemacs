@@ -80,11 +80,12 @@ Result keys: :mode (`three `two `one), :sidebar (git status/terminal),
               :frame frame-width)))
      (t (list :mode 'one :frame frame-width)))))
 
-(defun vibemacs-worktrees--apply-layout (root-window dashboard-buffer git-status-buffer entry widths)
+(defun vibemacs-worktrees--apply-layout
+    (root-window dashboard-buffer git-status-buffer entry widths)
   "Build window layout starting from ROOT-WINDOW using WIDTHS.
 Assigns DASHBOARD-BUFFER and GIT-STATUS-BUFFER where applicable.
 ENTRY provides context for terminal buffer creation.
-Returns plist with :mode and window roles (:dashboard :chat :git-status :terminal)."
+Returns plist with :mode and window roles."
   (pcase (plist-get widths :mode)
     ('three
      (let* ((sidebar-width (plist-get widths :sidebar))
@@ -368,7 +369,7 @@ When ENTRY is nil, reuse the currently active worktree."
 
 (defun vibemacs-worktrees-center-show-diff (&optional entry file)
   "Activate the diff tab in the center pane.
-ENTRY defaults to the currently selected worktree. FILE limits the diff to a single path."
+ENTRY defaults to current worktree.  FILE limits diff to one path."
   (interactive)
   (let ((entry (or entry (vibemacs-worktrees-center--current-entry))))
     (unless entry
@@ -478,10 +479,9 @@ ENTRY defaults to the currently selected worktree. FILE limits the diff to a sin
     (setq vibemacs-worktrees--startup-applied t)))
 
 ;;;###autoload
-(defun vibemacs-worktrees-launch-home (&optional force)
-  "Launch the vibemacs dashboard layout.
-With FORCE (interactive prefix), rebuild the layout even if it was already applied."
-  (interactive "P")
+(defun vibemacs-worktrees-launch-home ()
+  "Launch the vibemacs dashboard layout."
+  (interactive)
   ;; Returning home should always clear the active worktree state
   (setq vibemacs-worktrees--active-root nil)
   (setq vibemacs-worktrees--center-window nil)

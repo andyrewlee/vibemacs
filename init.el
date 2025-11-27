@@ -352,7 +352,7 @@ Falls back to default evil-quit for special buffers."
 ;; Anti-flicker filter for vterm (helps with Claude Code and other TUI apps)
 (use-package vterm-anti-flicker-filter
   :after vterm
-  :vc (:fetcher github :repo martinbaillie/vterm-anti-flicker-filter))
+  :vc (:url "https://github.com/martinbaillie/vterm-anti-flicker-filter"))
 
 ;;; prose polish
 ;;; Aesthetics for writing prose (used in Markdown).
