@@ -235,7 +235,8 @@ ON-FAILURE is called with error message if any command fails."
            (expanded-cmd (replace-regexp-in-string
                           "\\$ROOT_WORKTREE_PATH"
                           repo
-                          cmd)))
+                          cmd
+                          t)))
       ;; Set ROOT_WORKTREE_PATH environment variable
       (setenv "ROOT_WORKTREE_PATH" repo)
       (message "[worktrees] [%d/%d] Executing: %s"
