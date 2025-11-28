@@ -255,15 +255,8 @@ HELP overrides the default hover tooltip."
          (tooltip (when primary
                     "RET: activate main • Tabs switch panes • Chat ready"))
          (name-str (vibemacs-worktrees--entry-name entry))
-         (branch-str (vibemacs-worktrees--entry-branch entry))
-         (dirty-count (car status-info))
-         (status-str (cdr status-info))
-         (display-str
-          (concat (vibemacs-worktrees-dashboard--format-cell name-str row-face entry tooltip)
-                  (propertize " (" 'face 'shadow)
-                  (vibemacs-worktrees-dashboard--format-cell branch-str row-face)
-                  (propertize ") " 'face 'shadow)
-                  (vibemacs-worktrees-dashboard--format-cell status-str (if (> dirty-count 0) 'warning 'shadow)))))
+         (_dirty-count (car status-info))
+         (display-str (vibemacs-worktrees-dashboard--format-cell name-str row-face entry tooltip)))
     (list root (vector display-str))))
 
 (defun vibemacs-worktrees-dashboard--entries ()
