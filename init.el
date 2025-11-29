@@ -173,7 +173,7 @@ Falls back to default evil-quit for special buffers."
   :config
   (which-key-mode 1))
 
-;;; keymaps with SPC as global leader
+;;; keymaps with S-SPC as global leader
 ;;; General.el for defining leader keys and keymaps.
 (use-package general
   :after evil
@@ -182,7 +182,7 @@ Falls back to default evil-quit for special buffers."
   (general-create-definer vibemacs-leader
     :states '(normal insert visual motion emacs)
     :keymaps 'override
-    :prefix "SPC"
+    :prefix "S-SPC"
     :global-prefix "M-SPC")
   (vibemacs-leader
     "SPC"  '(execute-extended-command            :which-key "M-x")
@@ -230,12 +230,12 @@ Falls back to default evil-quit for special buffers."
     "gF"   '(magit-pull                          :which-key "pull")
     "gR"   '(magit-rebase                        :which-key "rebase")
     ;; window
-    "wS"   '(vibemacs-horizontal-split           :which-key "horizontal split")
-    "wV"   '(vibemacs-vertical-split             :which-key "vertical split")
-    "wk"   '(windmove-up                         :which-key "move to top window")
-    "wl"   '(windmove-right                      :which-key "move to right rindow")
-    "wh"   '(windmove-left                       :which-key "move to left window")
-    "wj"   '(windmove-down                       :which-key "move to bottom window")
+    "h"    '(windmove-left                       :which-key "window left")
+    "j"    '(windmove-down                       :which-key "window down")
+    "k"    '(windmove-up                         :which-key "window up")
+    "l"    '(windmove-right                      :which-key "window right")
+    "S"    '(vibemacs-horizontal-split           :which-key "horizontal split")
+    "V"    '(vibemacs-vertical-split             :which-key "vertical split")
     ;; tabs
     "tn"   '(tab-line-switch-to-next-tab         :which-key "next tab")
     "tp"   '(tab-line-switch-to-prev-tab         :which-key "previous tab")

@@ -152,7 +152,7 @@ Dashboard and list views use `tabulated-list-mode`:
 
 - **Custom File**: Customizations are stored in `custom.el` (not `init.el`)
 - **Theme**: doom-one with disabled bold/italic and subdued comments/modeline
-- **Leader Key**: SPC in normal/visual/motion, M-SPC globally
+- **Leader Key**: S-SPC in normal/visual/motion/emacs, M-SPC globally
 - **Port Allocation**: Each worktree gets a reserved port range (starting at 6200, 10 ports per worktree)
 - **Auto-save**: `delete-trailing-whitespace` runs on every save
 - **Primary Checkout Protection**: Cannot delete a worktree if its root equals the repo path

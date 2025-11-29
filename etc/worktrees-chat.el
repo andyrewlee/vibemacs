@@ -148,10 +148,7 @@ ASSISTANT is the identifier configured for the chat session."
         (tab-line-mode 1)
         ;; Disable evil mode in chat buffers to avoid clashing with CLI tools
         (when (and (fboundp 'evil-emacs-state) (bound-and-true-p evil-mode))
-          (evil-emacs-state)
-          ;; Bind S-SPC to trigger the leader menu in emacs state (SPC conflicts with typing)
-          (when (fboundp 'evil-local-set-key)
-            (evil-local-set-key 'emacs (kbd "S-SPC") (key-binding (kbd "M-SPC")))))
+          (evil-emacs-state))
         (unless (and vibemacs-worktrees--chat-command-started
                      (process-live-p (get-buffer-process buffer)))
           (when-let ((proc (get-buffer-process buffer)))
@@ -227,10 +224,7 @@ Returns the created buffer."
           (tab-line-mode 1)
           ;; Disable evil mode in agent buffers to avoid clashing with CLI tools
           (when (and (fboundp 'evil-emacs-state) (bound-and-true-p evil-mode))
-            (evil-emacs-state)
-            ;; Bind S-SPC to trigger the leader menu in emacs state (SPC conflicts with typing)
-            (when (fboundp 'evil-local-set-key)
-              (evil-local-set-key 'emacs (kbd "S-SPC") (key-binding (kbd "M-SPC")))))))
+            (evil-emacs-state))))
       ;; Optionally display the buffer in the center window
       (when buffer
         ;; Ensure the new buffer is added to the strict tab list
