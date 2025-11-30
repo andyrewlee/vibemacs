@@ -341,7 +341,37 @@ Falls back to default evil-quit for special buffers."
 (use-package vterm
   :commands (vterm)
   :init
-  (setq vterm-shell (or (getenv "SHELL") "/bin/zsh")))
+  (setq vterm-shell (or (getenv "SHELL") "/bin/zsh"))
+  :config
+  ;; Remove old advice if present (cleanup from previous config)
+  (advice-remove 'vterm--redraw #'vibemacs-vterm--preserve-scroll)
+
+  ;; Allow scrolling in normal mode by using vterm-copy-mode
+  ;; When user scrolls with C-u/C-d in normal mode, enter copy mode to freeze the view
+  ;; When entering insert mode, exit copy mode to resume live terminal
+  (defun vibemacs-vterm--maybe-enter-copy-mode ()
+    "Enter vterm-copy-mode when scrolling in normal mode."
+    (when (and (derived-mode-p 'vterm-mode)
+               (not vterm-copy-mode)
+               (evil-normal-state-p))
+      (vterm-copy-mode 1)))
+
+  (defun vibemacs-vterm--exit-copy-mode-for-insert ()
+    "Exit vterm-copy-mode when entering insert mode."
+    (when (and (derived-mode-p 'vterm-mode)
+               vterm-copy-mode)
+      (vterm-copy-mode -1)))
+
+  (add-hook 'evil-insert-state-entry-hook #'vibemacs-vterm--exit-copy-mode-for-insert)
+
+  (with-eval-after-load 'evil
+    (evil-define-key 'normal vterm-mode-map
+      (kbd "C-u") (lambda () (interactive)
+                    (vibemacs-vterm--maybe-enter-copy-mode)
+                    (evil-scroll-up nil))
+      (kbd "C-d") (lambda () (interactive)
+                    (vibemacs-vterm--maybe-enter-copy-mode)
+                    (evil-scroll-down nil)))))
 
 (use-package multi-vterm
   :after vterm
