@@ -502,8 +502,9 @@ is not the dashboard."
       (dired (vibemacs-worktrees--entry-root entry))
     (message "No worktree selected")))
 
-(defun vibemacs-worktrees-dashboard-enter ()
-  "Perform the default action for the row at point."
+(defun vibemacs-worktrees-dashboard-enter (&optional _event)
+  "Perform the default action for the row at point.
+_EVENT is the mouse event when invoked via mouse click (ignored)."
   (interactive)
   (let* ((id (tabulated-list-get-id))
          (type (cond
@@ -513,7 +514,7 @@ is not the dashboard."
          (data (and (consp id) (cdr id))))
     (pcase type
       (:home
-       (vibemacs-worktrees-launch-home t)
+       (vibemacs-worktrees-launch-home)
        (message "Returned to vibemacs home"))
       (:add-project
        (call-interactively #'vibemacs-project-add))
@@ -604,26 +605,34 @@ is not the dashboard."
         (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
                                    (abbreviate-file-name root)
                                    (if (and branch (not (string-empty-p branch))) branch "(none)")))
-          (condition-case err
-              (vibemacs-worktrees--call-git repo "worktree" "remove" "--force" root)
-            (error (message "Failed to remove worktree: %s" (error-message-string err))))
-          (condition-case err
-              (vibemacs-worktrees--call-git repo "worktree" "prune")
-            (error (message "Failed to prune worktrees: %s" (error-message-string err))))
-          (when (and branch (not (string-empty-p branch)))
+          (let ((warnings nil))
+            ;; Try git worktree remove first, fall back to rm -rf for deep node_modules
             (condition-case err
-                (vibemacs-worktrees--call-git repo "branch" "-D" branch)
-              (error (message "Failed to delete branch %s: %s" branch (error-message-string err)))))
-          (when (file-directory-p root)
-            (ignore-errors (delete-directory root t)))
-          (let ((meta (file-name-directory (vibemacs-worktrees--metadata-path entry))))
-            (when (and meta (file-directory-p meta))
-              (ignore-errors (delete-directory meta t))))
-          (vibemacs-worktrees--unregister root)
-          (remhash root vibemacs-worktrees--transcript-buffers)
-          (let ((next (car (vibemacs-worktrees--entries-safe))))
-            (vibemacs-worktrees-dashboard--activate next))
-          (message "Deleted worktree %s" (vibemacs-worktrees--entry-name entry))))
+                (vibemacs-worktrees--call-git repo "worktree" "remove" "--force" root)
+              (error
+               (push (format "git worktree remove: %s" (error-message-string err)) warnings)))
+            (when (file-directory-p root)
+              (shell-command (format "rm -rf %s" (shell-quote-argument (expand-file-name root)))))
+            (condition-case err
+                (vibemacs-worktrees--call-git repo "worktree" "prune")
+              (error
+               (push (format "git worktree prune: %s" (error-message-string err)) warnings)))
+            (when (and branch (not (string-empty-p branch)))
+              (condition-case err
+                  (vibemacs-worktrees--call-git repo "branch" "-D" branch)
+                (error
+                 (push (format "git branch -D %s: %s" branch (error-message-string err)) warnings))))
+            (let ((meta (file-name-directory (vibemacs-worktrees--metadata-path entry))))
+              (when (and meta (file-directory-p meta))
+                (ignore-errors (delete-directory meta t))))
+            (vibemacs-worktrees--unregister root)
+            (remhash root vibemacs-worktrees--transcript-buffers)
+            (vibemacs-worktrees-launch-home)
+            (if warnings
+                (message "Deleted worktree %s (warnings: %s)"
+                         (vibemacs-worktrees--entry-name entry)
+                         (string-join (nreverse warnings) "; "))
+              (message "Deleted worktree %s" (vibemacs-worktrees--entry-name entry))))))
     (message "No worktree selected")))
 
 ;;;###autoload

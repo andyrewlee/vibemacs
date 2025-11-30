@@ -43,5 +43,26 @@
       (goto-char (point-min))
       (search-forward "Worktree directory missing" nil t))))
 
+(ert-deftest vibemacs-worktrees-git-status--populate-not-git-repo ()
+  "Populate should show error for directory without .git."
+  (let* ((temp-dir (make-temp-file "not-git-repo" t))
+         (entry (vibemacs-worktrees--entry-create
+                 :name "not-git"
+                 :branch "main"
+                 :repo temp-dir
+                 :root temp-dir
+                 :base ""
+                 :created "2025-01-01T00:00:00Z"))
+         (vibemacs-worktrees-git-status--process nil)
+         (vibemacs-worktrees-git-status--process-root nil))
+    (unwind-protect
+        (progn
+          (vibemacs-worktrees-git-status--populate entry)
+          (should (null vibemacs-worktrees-git-status--process))
+          (with-current-buffer (get-buffer vibemacs-worktrees-git-status-buffer)
+            (goto-char (point-min))
+            (should (search-forward "Not a git repository" nil t))))
+      (delete-directory temp-dir t))))
+
 (provide 'worktrees-git-status-test)
 ;;; worktrees-git-status-test.el ends here

@@ -190,14 +190,20 @@ When MESSAGE is provided, display it instead of git status contents."
     (setq vibemacs-worktrees-git-status--process nil
           vibemacs-worktrees-git-status--process-root nil)
 
-    (if (not (and root (file-directory-p root)))
-        (vibemacs-worktrees-git-status--render
-         entry nil nil
-         (if root
-             (format "Worktree directory missing: %s" root)
-           "Worktree directory missing"))
+    (let ((git-file (expand-file-name ".git" root)))
+      (if (not (and root
+                    (file-directory-p root)
+                    (or (file-exists-p git-file)
+                        (file-directory-p git-file))))
+          (vibemacs-worktrees-git-status--render
+           entry nil nil
+           (cond
+            ((not root) "Worktree directory missing")
+            ((not (file-directory-p root))
+             (format "Worktree directory missing: %s" root))
+            (t (format "Not a git repository: %s" root))))
 
-      (setq vibemacs-worktrees-git-status--process-root root)
+        (setq vibemacs-worktrees-git-status--process-root root)
 
       ;; Kick off async git status; avoid blocking the UI on large repos.
       (let* ((temp-buffer (generate-new-buffer " *vibemacs-git-status*"))
@@ -213,8 +219,8 @@ When MESSAGE is provided, display it instead of git status contents."
         (process-put proc 'root root)
         (setq vibemacs-worktrees-git-status--process proc))
 
-      ;; Show placeholder while the async process runs.
-      (vibemacs-worktrees-git-status--render entry nil t))))
+        ;; Show placeholder while the async process runs.
+        (vibemacs-worktrees-git-status--render entry nil t)))))
 
 ;;; Git Status Auto-Refresh
 

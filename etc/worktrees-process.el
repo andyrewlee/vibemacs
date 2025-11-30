@@ -251,22 +251,25 @@ ON-FAILURE is called with error message if any command fails."
          proc
          (lambda (process event)
            (when (string-match-p "finished\\|exited" event)
-             (if (zerop (process-exit-status process))
-                 (progn
-                   (message "[worktrees] ✓ Command completed: %s" expanded-cmd)
-                   ;; Run next command
-                   (vibemacs-worktrees--run-setup-command
-                    remaining target-path repo name (1+ index) on-success on-failure))
-               (let ((error-msg (format "Command failed (exit %d): %s\nSee buffer: %s"
-                                        (process-exit-status process)
-                                        expanded-cmd
-                                        (buffer-name (process-buffer process)))))
-                 (message "[worktrees] ✗ %s" error-msg)
-                 (when on-failure (funcall on-failure error-msg))
-                 (when vibemacs-worktrees-setup-continue-on-error
-                   (message "[worktrees] Continuing setup despite failure…")
-                   (vibemacs-worktrees--run-setup-command
-                    remaining target-path repo name (1+ index) on-success on-failure)))))))))))
+             ;; Abort if worktree was deleted while setup was running
+             (if (not (file-directory-p target-path))
+                 (message "[worktrees] Setup aborted: worktree %s no longer exists" name)
+               (if (zerop (process-exit-status process))
+                   (progn
+                     (message "[worktrees] ✓ Command completed: %s" expanded-cmd)
+                     ;; Run next command
+                     (vibemacs-worktrees--run-setup-command
+                      remaining target-path repo name (1+ index) on-success on-failure))
+                 (let ((error-msg (format "Command failed (exit %d): %s\nSee buffer: %s"
+                                          (process-exit-status process)
+                                          expanded-cmd
+                                          (buffer-name (process-buffer process)))))
+                   (message "[worktrees] ✗ %s" error-msg)
+                   (when on-failure (funcall on-failure error-msg))
+                   (when vibemacs-worktrees-setup-continue-on-error
+                     (message "[worktrees] Continuing setup despite failure…")
+                     (vibemacs-worktrees--run-setup-command
+                      remaining target-path repo name (1+ index) on-success on-failure))))))))))))
 
 (defun vibemacs-worktrees--run-setup-commands (repo target-path name on-success on-failure)
   "Run setup commands from .vibemacs/worktrees.json config.
