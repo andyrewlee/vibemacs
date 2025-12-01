@@ -10,10 +10,31 @@
 (require 'filenotify)
 (require 'cl-lib)
 (require 'subr-x)
+(require 'seq)
 (eval-when-compile (require 'evil))
 
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
 (defvar vibemacs-worktrees--center-window)
+
+;;; Tab State Variables
+
+(defvar-local vibemacs-worktrees-git-status--active-tab 'files-changed
+  "Active tab in git status sidebar: `files-changed' or `project-directory'.")
+
+(defvar-local vibemacs-worktrees-git-status--expanded-dirs nil
+  "List of expanded directory paths in project directory view.")
+
+(defvar-local vibemacs-worktrees-git-status--cached-entry nil
+  "Cached worktree entry for the current buffer.")
+
+(defvar-local vibemacs-worktrees-git-status--cached-status nil
+  "Cached git status list for the files-changed tab.")
+
+(defvar-local vibemacs-worktrees-git-status--cached-message nil
+  "Cached error/info message for the files-changed tab.")
+
+(defvar-local vibemacs-worktrees-git-status--cached-refreshing nil
+  "Cached refreshing state for the files-changed tab.")
 
 ;;; Git Status Sidebar
 
@@ -29,22 +50,30 @@
 (defvar vibemacs-worktrees-git-status-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map special-mode-map)
-    (define-key map (kbd "RET") #'vibemacs-worktrees-git-status-open-file)
+    (define-key map (kbd "RET") #'vibemacs-worktrees-git-status-open-file-or-toggle)
+    (define-key map (kbd "TAB") #'vibemacs-worktrees-git-status-toggle-dir)
     (define-key map (kbd "g") #'vibemacs-worktrees-git-status-refresh)
+    (define-key map (kbd "1") #'vibemacs-worktrees-git-status-switch-to-files-changed)
+    (define-key map (kbd "2") #'vibemacs-worktrees-git-status-switch-to-project-directory)
     map)
   "Keymap for `vibemacs-worktrees-git-status-mode'.")
 
 (define-derived-mode vibemacs-worktrees-git-status-mode special-mode "Git-Status"
   "Sidebar view showing git status for the active worktree."
   (setq truncate-lines t)
-  (hl-line-mode 1))
+  (hl-line-mode 1)
+  (setq-local header-line-format
+              '(:eval (vibemacs-worktrees-git-status--header-line))))
 
 (eval-after-load 'evil
   '(when (fboundp 'evil-define-key)
      (dolist (state '(normal motion))
        (evil-define-key state vibemacs-worktrees-git-status-mode-map
-         (kbd "RET") #'vibemacs-worktrees-git-status-open-file
-         (kbd "g") #'vibemacs-worktrees-git-status-refresh))))
+         (kbd "RET") #'vibemacs-worktrees-git-status-open-file-or-toggle
+         (kbd "TAB") #'vibemacs-worktrees-git-status-toggle-dir
+         (kbd "g") #'vibemacs-worktrees-git-status-refresh
+         (kbd "1") #'vibemacs-worktrees-git-status-switch-to-files-changed
+         (kbd "2") #'vibemacs-worktrees-git-status-switch-to-project-directory))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-git-status--setup-buffer ()
@@ -55,6 +84,178 @@
       ;; Stop auto-refresh when buffer is killed
       (add-hook 'kill-buffer-hook #'vibemacs-worktrees-git-status--stop-auto-refresh nil t))
     buffer))
+
+;;; Header-Line Tabs
+
+(defvar vibemacs-worktrees-git-status--files-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1]
+      (lambda () (interactive) (vibemacs-worktrees-git-status-switch-to-files-changed)))
+    map)
+  "Keymap for Files tab in header line.")
+
+(defvar vibemacs-worktrees-git-status--explorer-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map [header-line mouse-1]
+      (lambda () (interactive) (vibemacs-worktrees-git-status-switch-to-project-directory)))
+    map)
+  "Keymap for Explorer tab in header line.")
+
+(defun vibemacs-worktrees-git-status--header-line ()
+  "Generate header line with tab buttons."
+  (let* ((files-active (eq vibemacs-worktrees-git-status--active-tab 'files-changed))
+         (explorer-active (eq vibemacs-worktrees-git-status--active-tab 'project-directory))
+         (files-face (if files-active
+                         '(:weight bold :underline t)
+                       '(:weight normal)))
+         (explorer-face (if explorer-active
+                            '(:weight bold :underline t)
+                          '(:weight normal))))
+    (concat
+     (propertize " changes "
+                 'face files-face
+                 'mouse-face 'highlight
+                 'help-echo "Click to show changed files (or press 1)"
+                 'keymap vibemacs-worktrees-git-status--files-keymap)
+     " "
+     (propertize " explorer "
+                 'face explorer-face
+                 'mouse-face 'highlight
+                 'help-echo "Click to browse project files (or press 2)"
+                 'keymap vibemacs-worktrees-git-status--explorer-keymap))))
+
+(defun vibemacs-worktrees-git-status-switch-to-files-changed ()
+  "Switch to the Files Changed tab."
+  (interactive)
+  (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+    (let ((was-explorer (eq vibemacs-worktrees-git-status--active-tab 'project-directory)))
+      (setq vibemacs-worktrees-git-status--active-tab 'files-changed)
+      (vibemacs-worktrees-git-status--redisplay)
+      ;; Ensure the Files tab shows fresh data after spending time in Explorer.
+      (when was-explorer
+        (vibemacs-worktrees-git-status--debounced-refresh)))))
+
+(defun vibemacs-worktrees-git-status-switch-to-project-directory ()
+  "Switch to the Project Directory tab."
+  (interactive)
+  (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+    (setq vibemacs-worktrees-git-status--active-tab 'project-directory)
+    (vibemacs-worktrees-git-status--redisplay)))
+
+(defun vibemacs-worktrees-git-status--redisplay ()
+  "Re-render the sidebar based on the active tab."
+  (when-let ((entry (or vibemacs-worktrees-git-status--cached-entry
+                        (vibemacs-worktrees-center--current-entry))))
+    (pcase vibemacs-worktrees-git-status--active-tab
+      ('files-changed
+       (vibemacs-worktrees-git-status--render-files-changed
+        entry
+        vibemacs-worktrees-git-status--cached-status
+        vibemacs-worktrees-git-status--cached-refreshing
+        vibemacs-worktrees-git-status--cached-message))
+      ('project-directory
+       (vibemacs-worktrees-git-status--render-project-directory
+        entry
+        vibemacs-worktrees-git-status--cached-message
+        vibemacs-worktrees-git-status--cached-refreshing)))
+    (force-mode-line-update)))
+
+;;; Project Directory Functions
+
+(defun vibemacs-worktrees-git-status--list-directory (dir)
+  "List files and directories in DIR, excluding hidden and ignored items."
+  (when (file-directory-p dir)
+    (let ((entries (directory-files dir nil "^[^.]" t)))
+      (seq-filter
+       (lambda (name)
+         (and (not (string= name ".git"))
+              (not (string-suffix-p ".elc" name))
+              (not (string= name "node_modules"))
+              (not (string= name "__pycache__"))
+              (not (string= name ".DS_Store"))))
+       entries))))
+
+(defun vibemacs-worktrees-git-status--render-project-directory (entry &optional message refreshing)
+  "Render the project directory tree for ENTRY.
+When MESSAGE is non-nil, show it above the tree.  When REFRESHING is
+non-nil, display a loading indicator.  This keeps git-status feedback
+visible even while browsing the Explorer tab."
+  (let* ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer))
+         (root (vibemacs-worktrees--entry-root entry)))
+    (with-current-buffer buffer
+      (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
+        (vibemacs-worktrees-git-status-mode))
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (setq vibemacs-worktrees-git-status--cached-entry entry)
+        (when message
+          (insert (propertize (concat message "\n") 'face 'font-lock-warning-face)))
+        (when (and refreshing (not message))
+          (insert (propertize "Refreshing…\n" 'face 'font-lock-comment-face)))
+        (if (not (file-directory-p root))
+            (insert (propertize "Directory not found\n" 'face 'font-lock-warning-face))
+          (vibemacs-worktrees-git-status--render-tree root root 0))
+        (goto-char (point-min))))
+    buffer))
+
+(defun vibemacs-worktrees-git-status--render-tree (dir root depth)
+  "Render directory tree starting at DIR with ROOT as project root at DEPTH."
+  (let* ((entries (vibemacs-worktrees-git-status--list-directory dir))
+         (sorted (sort entries
+                       (lambda (a b)
+                         (let ((a-dir (file-directory-p (expand-file-name a dir)))
+                               (b-dir (file-directory-p (expand-file-name b dir))))
+                           (cond
+                            ((and a-dir (not b-dir)) t)
+                            ((and (not a-dir) b-dir) nil)
+                            (t (string< a b))))))))
+    (dolist (name sorted)
+      (let* ((full-path (expand-file-name name dir))
+             (rel-path (file-relative-name full-path root))
+             (is-dir (file-directory-p full-path))
+             (is-expanded (member rel-path vibemacs-worktrees-git-status--expanded-dirs))
+             (indent (make-string (* depth 2) ?\s))
+             (icon (cond
+                    ((not is-dir) "  ")
+                    (is-expanded "▼ ")
+                    (t "▶ ")))
+             (display-name (if is-dir (concat name "/") name))
+             (face (if is-dir 'font-lock-function-name-face 'default))
+             (line-start (point)))
+        (insert indent)
+        (insert (propertize icon 'face 'font-lock-comment-face))
+        (insert (propertize display-name
+                            'face face
+                            'mouse-face 'highlight
+                            'help-echo (if is-dir "RET/TAB to toggle" "RET to open")))
+        (insert "\n")
+        (put-text-property line-start (1- (point)) 'vibemacs-file-path rel-path)
+        (put-text-property line-start (1- (point)) 'vibemacs-is-dir is-dir)
+        (when (and is-dir is-expanded)
+          (vibemacs-worktrees-git-status--render-tree full-path root (1+ depth)))))))
+
+(defun vibemacs-worktrees-git-status-toggle-dir ()
+  "Toggle expansion of directory at point."
+  (interactive)
+  (when-let* ((path (get-text-property (point) 'vibemacs-file-path))
+              (is-dir (get-text-property (point) 'vibemacs-is-dir)))
+    (when is-dir
+      (if (member path vibemacs-worktrees-git-status--expanded-dirs)
+          (setq vibemacs-worktrees-git-status--expanded-dirs
+                (delete path vibemacs-worktrees-git-status--expanded-dirs))
+        (push path vibemacs-worktrees-git-status--expanded-dirs))
+      (let ((line (line-number-at-pos)))
+        (vibemacs-worktrees-git-status--redisplay)
+        (goto-char (point-min))
+        (forward-line (1- line))))))
+
+(defun vibemacs-worktrees-git-status-open-file-or-toggle ()
+  "Open file at point, or toggle directory expansion."
+  (interactive)
+  (let ((is-dir (get-text-property (point) 'vibemacs-is-dir)))
+    (if (and is-dir (eq vibemacs-worktrees-git-status--active-tab 'project-directory))
+        (vibemacs-worktrees-git-status-toggle-dir)
+      (vibemacs-worktrees-git-status-open-file))))
 
 (declare-function vibemacs-worktrees--add-to-tabs "worktrees-layout")
 
@@ -108,48 +309,63 @@ After opening, enables diff-hl and jumps to the first change."
 (defun vibemacs-worktrees-git-status--render (entry status-list &optional refreshing message)
   "Render STATUS-LIST for ENTRY into the git status sidebar buffer.
 When REFRESHING is non-nil, show a loading message instead of git output.
-When MESSAGE is provided, display it instead of git status contents."
+When MESSAGE is provided, display it instead of git status contents.
+Dispatches to the appropriate tab renderer based on active tab."
+  (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
+    (with-current-buffer buffer
+      (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
+        (vibemacs-worktrees-git-status-mode))
+      ;; Cache entry, status, message, and refreshing state for tab switching
+      (setq vibemacs-worktrees-git-status--cached-entry entry)
+      (setq vibemacs-worktrees-git-status--cached-status status-list)
+      (setq vibemacs-worktrees-git-status--cached-message message)
+      (setq vibemacs-worktrees-git-status--cached-refreshing refreshing)
+      ;; Render based on active tab
+      (pcase vibemacs-worktrees-git-status--active-tab
+        ('project-directory
+         (vibemacs-worktrees-git-status--render-project-directory
+          entry message refreshing))
+        (_
+         (vibemacs-worktrees-git-status--render-files-changed entry status-list refreshing message))))
+    buffer))
+
+(defun vibemacs-worktrees-git-status--render-files-changed (entry status-list &optional refreshing message)
+  "Render FILES-CHANGED tab content for ENTRY with STATUS-LIST.
+When REFRESHING is non-nil, show a loading message.
+When MESSAGE is provided, display it instead of git status."
   (let ((buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)))
     (with-current-buffer buffer
       (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
         (vibemacs-worktrees-git-status-mode))
       (let ((inhibit-read-only t))
         (erase-buffer)
-         (insert (propertize "Git Status\n" 'face 'bold))
-        (insert (propertize (format "%s\n" (vibemacs-worktrees--entry-name entry))
-                            'face 'font-lock-comment-face))
-        (insert (propertize "──────────────────────\n" 'face 'shadow))
+        (setq vibemacs-worktrees-git-status--cached-entry entry)
         (cond
          (message
           (insert (propertize (concat message "\n") 'face 'font-lock-warning-face)))
          (refreshing
           (insert (propertize "Refreshing…\n" 'face 'font-lock-comment-face)))
          (status-list
-            (dolist (status status-list)
-              (pcase-let ((`(,code . ,path) status))
-                (let* ((status-face (cond
-                                     ((string-match-p "^M" code) 'font-lock-warning-face)
-                                     ((string-match-p "^A" code) 'success)
-                                     ((string-match-p "^D" code) 'error)
-                                     ((string-match-p "^\\?\\?" code) 'font-lock-comment-face)
-                                     (t 'default)))
-                       (line-start (point)))
-                  (require 'button)
-                  ;; Insert status code with face
-                  (insert (propertize (format "%-3s" (if (> (length code) 0) code "??"))
-                                      'face status-face))
-                  ;; Insert filename with face
-                  (insert (propertize path
-                                      'face 'default
-                                      'mouse-face 'highlight
-                                      'help-echo "RET to open file"))
-                  (insert "\n")
-                  ;; Add vibemacs-file-path property to entire line
-                  (put-text-property line-start (1- (point)) 'vibemacs-file-path path)))))
+          (dolist (status status-list)
+            (pcase-let ((`(,code . ,path) status))
+              (let* ((status-face (cond
+                                   ((string-match-p "^M" code) 'font-lock-warning-face)
+                                   ((string-match-p "^A" code) 'success)
+                                   ((string-match-p "^D" code) 'error)
+                                   ((string-match-p "^\\?\\?" code) 'font-lock-comment-face)
+                                   (t 'default)))
+                     (line-start (point)))
+                (insert (propertize (format "%-3s" (if (> (length code) 0) code "??"))
+                                    'face status-face))
+                (insert (propertize path
+                                    'face 'default
+                                    'mouse-face 'highlight
+                                    'help-echo "RET to open file"))
+                (insert "\n")
+                (put-text-property line-start (1- (point)) 'vibemacs-file-path path)))))
          (t
           (insert (propertize "Working tree clean\n" 'face 'success))))
-        (goto-char (point-min))
-        (forward-line 3)))
+        (goto-char (point-min))))
     buffer))
 
 (defun vibemacs-worktrees-git-status--sentinel (proc event)
@@ -254,10 +470,14 @@ When MESSAGE is provided, display it instead of git status contents."
   "Seconds between periodic git status refreshes (nil to disable).")
 
 (defun vibemacs-worktrees-git-status--debounced-refresh ()
-  "Refresh git status if enough time has passed since last refresh."
+  "Refresh git status if enough time has passed since last refresh.
+Skips refresh when Explorer tab is active since it doesn't need git status."
   (let ((now (float-time)))
-    (when (> (- now vibemacs-worktrees-git-status--last-refresh-time)
-             vibemacs-worktrees-git-status--refresh-debounce)
+    (when (and (> (- now vibemacs-worktrees-git-status--last-refresh-time)
+                  vibemacs-worktrees-git-status--refresh-debounce)
+               ;; Only refresh when on Files tab
+               (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+                 (eq vibemacs-worktrees-git-status--active-tab 'files-changed)))
       (setq vibemacs-worktrees-git-status--last-refresh-time now)
       (when-let ((entry (vibemacs-worktrees-center--current-entry)))
         (vibemacs-worktrees-git-status--populate entry)))))
