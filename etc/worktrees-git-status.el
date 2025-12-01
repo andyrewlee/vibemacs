@@ -59,7 +59,8 @@
 (declare-function vibemacs-worktrees--add-to-tabs "worktrees-layout")
 
 (defun vibemacs-worktrees-git-status-open-file ()
-  "Open the file at point in the center window (shows as tab with tab-line-mode)."
+  "Open the file at point in the center window (shows as tab with tab-line-mode).
+After opening, enables diff-hl and jumps to the first change."
   (interactive)
   (when-let* ((entry (vibemacs-worktrees-center--current-entry))
               (root (vibemacs-worktrees--entry-root entry))
@@ -70,7 +71,20 @@
         (find-file (expand-file-name file root))
         ;; Add to strict tab list
         (when (fboundp 'vibemacs-worktrees--add-to-tabs)
-          (vibemacs-worktrees--add-to-tabs (current-buffer)))))))
+          (vibemacs-worktrees--add-to-tabs (current-buffer)))
+        ;; Enable diff-hl if available and refresh it
+        (when (fboundp 'diff-hl-mode)
+          (unless (bound-and-true-p diff-hl-mode)
+            (diff-hl-mode 1))
+          ;; Use margin mode for better visibility
+          (when (and (fboundp 'diff-hl-margin-mode)
+                     (not (bound-and-true-p diff-hl-margin-mode)))
+            (diff-hl-margin-mode 1))
+          (when (fboundp 'diff-hl-update)
+            (diff-hl-update))
+          ;; Jump to first change
+          (goto-char (point-min))
+          (ignore-errors (diff-hl-next-hunk)))))))
 
 (defun vibemacs-worktrees-git-status-refresh ()
   "Refresh the git status sidebar for the current worktree."
