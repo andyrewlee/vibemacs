@@ -31,6 +31,9 @@
 (defvar vibemacs-worktrees--explicit-tab-lists (make-hash-table :test 'equal)
   "Per-worktree mapping of explicit tab buffers used in the center pane.")
 
+(defvar vibemacs-worktrees--terminal-tab-lists)
+(defvar vibemacs-worktrees--buffer-root)
+
 (defcustom vibemacs-worktrees-terminal-max-scrollback 4000
   "Maximum scrollback lines for worktree terminal buffers.
 Lower this if noisy logs cause UI jank; increase if you need more history."
@@ -153,11 +156,34 @@ Returns plist with :mode and window roles."
 
 ;;; Center Pane Management
 
+;;; Terminal Tab Management
+
+(defun vibemacs-worktrees--add-to-terminal-tabs (buffer entry)
+  "Add BUFFER to the terminal tab list for ENTRY's worktree."
+  (when (and (buffer-live-p buffer) entry)
+    (let* ((root (expand-file-name (vibemacs-worktrees--entry-root entry)))
+           (current-tabs (gethash root vibemacs-worktrees--terminal-tab-lists))
+           (clean-tabs (seq-filter #'buffer-live-p current-tabs))
+           (new-tabs (if (member buffer clean-tabs)
+                         clean-tabs
+                       (append clean-tabs (list buffer)))))
+      (puthash root new-tabs vibemacs-worktrees--terminal-tab-lists))))
+
+(defun vibemacs-worktrees--terminal-tab-line-tabs ()
+  "Return list of terminal buffers for the current worktree in the terminal pane."
+  (let* ((entry (vibemacs-worktrees-center--current-entry))
+         (current-root (when entry
+                         (expand-file-name (vibemacs-worktrees--entry-root entry)))))
+    (if current-root
+        (seq-filter #'buffer-live-p
+                    (gethash current-root vibemacs-worktrees--terminal-tab-lists))
+      nil)))
+
 (defun vibemacs-worktrees--right-terminal-buffer (entry)
   "Return or create a terminal buffer for ENTRY in the right sidebar."
   (let* ((name (vibemacs-worktrees--entry-name entry))
          (root (vibemacs-worktrees--entry-root entry))
-         (buffer-name (format "*worktree-%s-sidebar-term*" name))
+         (buffer-name (format vibemacs-worktrees-sidebar-terminal-buffer-prefix name))
          (existing-buffer (get-buffer buffer-name)))
     (if (and existing-buffer (buffer-live-p existing-buffer))
         existing-buffer
@@ -167,7 +193,70 @@ Returns plist with :mode and window roles."
           (with-current-buffer (vterm)
             (setq-local header-line-format nil)
             (setq-local vterm-max-scrollback vibemacs-worktrees-terminal-max-scrollback)
+            (setq-local vibemacs-worktrees--buffer-root root)
+            (setq-local tab-line-tabs-function #'vibemacs-worktrees--terminal-tab-line-tabs)
+            (tab-line-mode 1)
+            (vibemacs-worktrees--add-to-terminal-tabs (current-buffer) entry)
             (current-buffer)))))))
+
+;;;###autoload
+(defun vibemacs-worktrees-new-terminal-tab ()
+  "Create a new terminal tab in the right sidebar for the current worktree.
+The new terminal is displayed but cursor stays in the current window."
+  (interactive)
+  (let ((entry (vibemacs-worktrees-center--current-entry)))
+    (unless entry
+      (user-error "Select a worktree before creating a terminal tab"))
+    (let* ((name (vibemacs-worktrees--entry-name entry))
+           (root (vibemacs-worktrees--entry-root entry))
+           (base-name (format vibemacs-worktrees-sidebar-terminal-buffer-prefix name))
+           (buffer-name (generate-new-buffer-name base-name))
+           (default-directory root)
+           buffer)
+      (vibemacs-worktrees--ensure-vterm)
+      (let ((vterm-buffer-name buffer-name))
+        (save-window-excursion
+          (vterm)
+          (setq buffer (get-buffer buffer-name))
+          (when buffer
+            (with-current-buffer buffer
+              (setq-local header-line-format nil)
+              (setq-local vterm-max-scrollback vibemacs-worktrees-terminal-max-scrollback)
+              (setq-local vibemacs-worktrees--buffer-root root)
+              (setq-local tab-line-tabs-function #'vibemacs-worktrees--terminal-tab-line-tabs)
+              (tab-line-mode 1))
+            (vibemacs-worktrees--add-to-terminal-tabs buffer entry))))
+      (when (and buffer (window-live-p vibemacs-worktrees--terminal-window))
+        (set-window-buffer vibemacs-worktrees--terminal-window buffer)
+        (message "Created new terminal tab: %s" buffer-name)))))
+
+;;;###autoload
+(defun vibemacs-worktrees-smart-next-tab ()
+  "Switch to next tab, context-aware for terminal or center pane."
+  (interactive)
+  (if (and (window-live-p vibemacs-worktrees--terminal-window)
+           (eq (selected-window) vibemacs-worktrees--terminal-window))
+      (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
+             (current (current-buffer))
+             (pos (cl-position current tabs))
+             (next-pos (when pos (mod (1+ pos) (length tabs)))))
+        (when (and next-pos tabs)
+          (switch-to-buffer (nth next-pos tabs))))
+    (tab-line-switch-to-next-tab)))
+
+;;;###autoload
+(defun vibemacs-worktrees-smart-prev-tab ()
+  "Switch to previous tab, context-aware for terminal or center pane."
+  (interactive)
+  (if (and (window-live-p vibemacs-worktrees--terminal-window)
+           (eq (selected-window) vibemacs-worktrees--terminal-window))
+      (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
+             (current (current-buffer))
+             (pos (cl-position current tabs))
+             (prev-pos (when pos (mod (1- pos) (length tabs)))))
+        (when (and prev-pos tabs)
+          (switch-to-buffer (nth prev-pos tabs))))
+    (tab-line-switch-to-prev-tab)))
 
 (defun vibemacs-worktrees-update-right-terminal (&optional entry)
   "Update the right terminal window to show terminal for ENTRY.

@@ -146,8 +146,11 @@ When set to `none', stay within the diff buffer that is already shown."
 (defvar vibemacs-worktrees-diff-buffer "*vibemacs Diff*"
   "Buffer name for the diff review pane.")
 
-(defvar vibemacs-worktrees-terminal-buffer-prefix "*worktree-%s-term*"
-  "Format string used for per-worktree terminal buffers.")
+(defvar vibemacs-worktrees-terminal-buffer-prefix "*worktree-%s-main-term*"
+  "Format string used for center-pane per-worktree terminal buffers.")
+
+(defvar vibemacs-worktrees-sidebar-terminal-buffer-prefix "*worktree-%s-sidebar-term*"
+  "Format string used for right-sidebar per-worktree terminal buffers.")
 
 (defvar vibemacs-worktrees--center-window nil
   "Window used for the central chat/terminal pane.")
@@ -166,6 +169,9 @@ When set to `none', stay within the diff buffer that is already shown."
 
 (defvar vibemacs-worktrees--tab-orders (make-hash-table :test 'equal)
   "Per-worktree buffer order used for tab-line in the center pane.")
+
+(defvar vibemacs-worktrees--terminal-tab-lists (make-hash-table :test 'equal)
+  "Per-worktree mapping of terminal buffers in the right sidebar.")
 
 (defvar vibemacs-worktrees--startup-applied nil
   "Whether the vibemacs startup layout has already been applied this session.")

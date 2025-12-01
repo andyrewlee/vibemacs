@@ -214,8 +214,9 @@ Falls back to default evil-quit for special buffers."
     "vap"  '(vibemacs-worktrees-create-plan       :which-key "create AI plan")
     "vah"  '(vibemacs-worktrees-create-handoff    :which-key "create handoff")
     "vtk"  '(vibemacs-worktrees-terminal-kill-server :which-key "kill terminal server")
-    "vn"   '(tab-line-switch-to-next-tab          :which-key "next tab")
-    "vp"   '(tab-line-switch-to-prev-tab          :which-key "previous tab")
+    "vtn"  '(vibemacs-worktrees-new-terminal-tab  :which-key "new terminal tab")
+    "vn"   '(vibemacs-worktrees-smart-next-tab    :which-key "next tab")
+    "vp"   '(vibemacs-worktrees-smart-prev-tab    :which-key "previous tab")
     "aw"   '(vibemacs-worktrees-dispatch         :which-key "worktrees")
     ;; git
     "g."   '(magit-dispatch                      :which-key "menu")
