@@ -271,5 +271,73 @@
                     ("SPC w l" . windmove-right)))
       (should (eq (key-binding (kbd (car pair))) (cdr pair))))))
 
+(ert-deftest vibemacs-git-status-pane-has-two-tabs ()
+  "Git status pane should have changes and explorer tabs that can be switched."
+  (let* ((root (make-temp-file "vibemacs-git-tabs" t))
+         (entry (vibemacs-worktrees--entry-create
+                 :name "demo" :branch "demo" :repo root :root root :base "" :created "ts"))
+         (vibemacs-worktrees-git-status-buffer "*test-git-tabs*"))
+    (unwind-protect
+        (progn
+          ;; Create some test files/dirs
+          (make-directory (expand-file-name "src" root))
+          (write-region "" nil (expand-file-name "README.md" root))
+          ;; Setup buffer
+          (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+            (vibemacs-worktrees-git-status-mode)
+            (setq vibemacs-worktrees-git-status--cached-entry entry)
+            ;; Verify default tab is changes (files-changed)
+            (should (eq vibemacs-worktrees-git-status--active-tab 'files-changed))
+            ;; Verify header line has both tabs
+            (let ((header (vibemacs-worktrees-git-status--header-line)))
+              (should (string-match-p "changes" header))
+              (should (string-match-p "explorer" header)))
+            ;; Switch to explorer tab
+            (vibemacs-worktrees-git-status-switch-to-project-directory)
+            (should (eq vibemacs-worktrees-git-status--active-tab 'project-directory))
+            ;; Verify explorer shows project files
+            (goto-char (point-min))
+            (should (search-forward "src" nil t))
+            (should (search-forward "README.md" nil t))
+            ;; Switch back to changes tab
+            (vibemacs-worktrees-git-status-switch-to-files-changed)
+            (should (eq vibemacs-worktrees-git-status--active-tab 'files-changed))))
+      (when (get-buffer vibemacs-worktrees-git-status-buffer)
+        (kill-buffer vibemacs-worktrees-git-status-buffer))
+      (delete-directory root t))))
+
+(ert-deftest vibemacs-smart-tab-switches-git-status-tabs ()
+  "SPC v n/p should toggle between changes and explorer when in git status pane."
+  (let* ((root (make-temp-file "vibemacs-smart-tab" t))
+         (entry (vibemacs-worktrees--entry-create
+                 :name "demo" :branch "demo" :repo root :root root :base "" :created "ts"))
+         (vibemacs-worktrees-git-status-buffer "*test-smart-tab*")
+         (vibemacs-worktrees--right-window nil))
+    (unwind-protect
+        (save-window-excursion
+          (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+            (vibemacs-worktrees-git-status-mode)
+            (setq vibemacs-worktrees-git-status--cached-entry entry))
+          (setq vibemacs-worktrees--right-window (selected-window))
+          (set-window-buffer vibemacs-worktrees--right-window vibemacs-worktrees-git-status-buffer)
+          ;; Start on changes tab
+          (with-current-buffer vibemacs-worktrees-git-status-buffer
+            (should (eq vibemacs-worktrees-git-status--active-tab 'files-changed)))
+          ;; Smart next should switch to explorer
+          (vibemacs-worktrees-smart-next-tab)
+          (with-current-buffer vibemacs-worktrees-git-status-buffer
+            (should (eq vibemacs-worktrees-git-status--active-tab 'project-directory)))
+          ;; Smart next again should switch back to changes
+          (vibemacs-worktrees-smart-next-tab)
+          (with-current-buffer vibemacs-worktrees-git-status-buffer
+            (should (eq vibemacs-worktrees-git-status--active-tab 'files-changed)))
+          ;; Smart prev should also toggle
+          (vibemacs-worktrees-smart-prev-tab)
+          (with-current-buffer vibemacs-worktrees-git-status-buffer
+            (should (eq vibemacs-worktrees-git-status--active-tab 'project-directory))))
+      (when (get-buffer vibemacs-worktrees-git-status-buffer)
+        (kill-buffer vibemacs-worktrees-git-status-buffer))
+      (delete-directory root t))))
+
 (provide 'worktrees-workflows-test)
 ;;; worktrees-workflows-test.el ends here

@@ -19,6 +19,9 @@
 (declare-function vibemacs-worktrees-git-status--setup-buffer "worktrees-git-status")
 (declare-function vibemacs-worktrees-git-status--populate "worktrees-git-status")
 (declare-function vibemacs-worktrees-git-status--start-auto-refresh "worktrees-git-status")
+(declare-function vibemacs-worktrees-git-status-switch-to-files-changed "worktrees-git-status")
+(declare-function vibemacs-worktrees-git-status-switch-to-project-directory "worktrees-git-status")
+(defvar vibemacs-worktrees-git-status--active-tab)
 (declare-function vibemacs-worktrees--ensure-vterm "worktrees-process")
 (declare-function vibemacs-worktrees--has-any-chat-tabs "worktrees-chat")
 (declare-function vibemacs-worktrees--create-agent-tab "worktrees-chat")
@@ -232,31 +235,53 @@ The new terminal is displayed but cursor stays in the current window."
 
 ;;;###autoload
 (defun vibemacs-worktrees-smart-next-tab ()
-  "Switch to next tab, context-aware for terminal or center pane."
+  "Switch to next tab, context-aware for terminal, git status, or center pane."
   (interactive)
-  (if (and (window-live-p vibemacs-worktrees--terminal-window)
-           (eq (selected-window) vibemacs-worktrees--terminal-window))
-      (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
-             (current (current-buffer))
-             (pos (cl-position current tabs))
-             (next-pos (when pos (mod (1+ pos) (length tabs)))))
-        (when (and next-pos tabs)
-          (switch-to-buffer (nth next-pos tabs))))
-    (tab-line-switch-to-next-tab)))
+  (cond
+   ;; Git status pane - toggle between Files and Explorer
+   ((and (window-live-p vibemacs-worktrees--right-window)
+         (eq (selected-window) vibemacs-worktrees--right-window))
+    (if (fboundp 'vibemacs-worktrees-git-status-switch-to-project-directory)
+        (with-current-buffer (window-buffer vibemacs-worktrees--right-window)
+          (if (eq vibemacs-worktrees-git-status--active-tab 'files-changed)
+              (vibemacs-worktrees-git-status-switch-to-project-directory)
+            (vibemacs-worktrees-git-status-switch-to-files-changed)))))
+   ;; Terminal pane - cycle through terminal tabs
+   ((and (window-live-p vibemacs-worktrees--terminal-window)
+         (eq (selected-window) vibemacs-worktrees--terminal-window))
+    (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
+           (current (current-buffer))
+           (pos (cl-position current tabs))
+           (next-pos (when pos (mod (1+ pos) (length tabs)))))
+      (when (and next-pos tabs)
+        (switch-to-buffer (nth next-pos tabs)))))
+   ;; Center pane - use tab-line
+   (t (tab-line-switch-to-next-tab))))
 
 ;;;###autoload
 (defun vibemacs-worktrees-smart-prev-tab ()
-  "Switch to previous tab, context-aware for terminal or center pane."
+  "Switch to previous tab, context-aware for terminal, git status, or center pane."
   (interactive)
-  (if (and (window-live-p vibemacs-worktrees--terminal-window)
-           (eq (selected-window) vibemacs-worktrees--terminal-window))
-      (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
-             (current (current-buffer))
-             (pos (cl-position current tabs))
-             (prev-pos (when pos (mod (1- pos) (length tabs)))))
-        (when (and prev-pos tabs)
-          (switch-to-buffer (nth prev-pos tabs))))
-    (tab-line-switch-to-prev-tab)))
+  (cond
+   ;; Git status pane - toggle between Files and Explorer
+   ((and (window-live-p vibemacs-worktrees--right-window)
+         (eq (selected-window) vibemacs-worktrees--right-window))
+    (if (fboundp 'vibemacs-worktrees-git-status-switch-to-files-changed)
+        (with-current-buffer (window-buffer vibemacs-worktrees--right-window)
+          (if (eq vibemacs-worktrees-git-status--active-tab 'project-directory)
+              (vibemacs-worktrees-git-status-switch-to-files-changed)
+            (vibemacs-worktrees-git-status-switch-to-project-directory)))))
+   ;; Terminal pane - cycle through terminal tabs
+   ((and (window-live-p vibemacs-worktrees--terminal-window)
+         (eq (selected-window) vibemacs-worktrees--terminal-window))
+    (let* ((tabs (vibemacs-worktrees--terminal-tab-line-tabs))
+           (current (current-buffer))
+           (pos (cl-position current tabs))
+           (prev-pos (when pos (mod (1- pos) (length tabs)))))
+      (when (and prev-pos tabs)
+        (switch-to-buffer (nth prev-pos tabs)))))
+   ;; Center pane - use tab-line
+   (t (tab-line-switch-to-prev-tab))))
 
 (defun vibemacs-worktrees-update-right-terminal (&optional entry)
   "Update the right terminal window to show terminal for ENTRY.
