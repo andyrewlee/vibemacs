@@ -6,13 +6,15 @@
 ## Build, Test, and Development Commands
 - `EMACSLOADPATH=$PWD emacs -Q --load init.el` launches vibemacs with only this repo on the load path; use it for manual verification.
 - `EMACSLOADPATH=$PWD emacs -Q --batch -l init.el -f batch-byte-compile etc/worktrees-*.el` ensures every module byte-compiles cleanly.
+- `make ert-git`, `make ert-layout`, and `make ert-workflows` run the targeted ERT suites; `make test` runs all of them plus byte-compilation.
+- `EMACSLOADPATH=$PWD emacs -Q --batch -l init.el -l etc/worktrees-workflows-test.el -f ert-run-tests-batch-and-exit` runs the high-level workflow stories directly.
 - `npm install -g typescript typescript-language-server prettier eslint_d` matches the TypeScript tooling assumed in `init.el`; re-run when upgrading language support.
 
 ## Coding Style & Naming Conventions
 Use two-space indentation and spaces over tabs (`indent-tabs-mode` is disabled globally). Name public symbols with the `vibemacs-` prefix and keep module-specific helpers in the corresponding `worktrees-*.el`. Configure features through `use-package` blocks, declaring `:init` intent separate from `:config`. For TypeScript buffers, rely on eglot + corfu + apheleia; keep formatter settings in `init.el` and avoid per-file overrides unless absolutely necessary.
 
 ## Testing Guidelines
-Automated ERT suites are not yet checked in, but new functionality should ship with batchable tests placed next to the module (e.g., `etc/worktrees-dashboard-test.el`). Run them via `EMACSLOADPATH=$PWD emacs -Q --batch -L etc -l ert -l etc/worktrees-dashboard-test.el -f ert-run-tests-batch-and-exit`. UI-heavy changes should also be smoke-tested interactively by launching the dashboard (`SPC aw`) and exercising the chat/diff/terminal panes.
+Automated ERT suites live alongside their modules (e.g., `etc/worktrees-dashboard-test.el`, `etc/worktrees-git-status-test.el`) plus an end-to-end workflow suite (`etc/worktrees-workflows-test.el`). Run them via `make ert-git`, `make ert-layout`, `make ert-workflows`, or `make test`. UI-heavy changes should also be smoke-tested interactively by launching the dashboard (`SPC aw`) and exercising the chat/diff/terminal panes.
 
 ## Commit & Pull Request Guidelines
 Recent history (e.g., `Add Gemini as third coding agent (#21)`) shows short, imperative subjects plus a linked issue or PR number; follow that style and include agent context when relevant. Keep commits focused on one concern, and describe any user-visible change in the body. Pull requests should document the motivation, summarize manual test steps, attach screenshots/gifs for dashboard tweaks, and call out any migrations (package refresh, tree-sitter library updates). Avoid committing personal `.vibemacs/worktrees.json` edits unless they are intentional fixtures.
