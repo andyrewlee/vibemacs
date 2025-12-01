@@ -21,8 +21,9 @@
 ;;; package manager
 ;;; Configure standard package archives and bootstrap use-package.
 (setq package-enable-at-startup nil)
-;; Must be set before Evil/Evil-collection load to avoid warnings.
-(setq evil-want-keybinding nil)
+;; Must be set before Evil/Evil-collection load so keymaps use Vim semantics.
+(setq evil-want-keybinding nil
+      evil-want-C-u-scroll t)
 ;; Start frames at a sane size so the home layout has room on launch.
 (setq frame-resize-pixelwise t)
 (add-to-list 'default-frame-alist '(width . 196))
@@ -131,8 +132,7 @@ Strips leading/trailing * from special buffers to keep names short."
 ;;; Evil mode configuration for Vim-like editing.
 (use-package evil
   :init
-  (setq evil-want-C-u-scroll t
-        evil-shift-width 2
+  (setq evil-shift-width 2
         evil-want-keybinding nil
         evil-normal-state-cursor '(box "#61afef")
         evil-insert-state-cursor '(bar "pink"))
