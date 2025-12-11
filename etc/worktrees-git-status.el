@@ -14,6 +14,7 @@
 (eval-when-compile (require 'evil))
 
 (declare-function vibemacs-worktrees-center--current-entry "worktrees-layout")
+(declare-function diff-hl-next-hunk "diff-hl")
 (defvar vibemacs-worktrees--center-window)
 
 ;;; Tab State Variables

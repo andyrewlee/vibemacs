@@ -12,6 +12,7 @@
 (require 'cl-lib)
 (require 'seq)
 (require 'diff-mode)
+(require 'tab-line)
 
 (declare-function vibemacs-worktrees-dashboard--setup-buffer "worktrees-dashboard")
 (declare-function vibemacs-worktrees-dashboard--activate "worktrees-dashboard")
