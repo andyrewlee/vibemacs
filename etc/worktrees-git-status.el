@@ -315,18 +315,32 @@ Dispatches to the appropriate tab renderer based on active tab."
     (with-current-buffer buffer
       (unless (derived-mode-p 'vibemacs-worktrees-git-status-mode)
         (vibemacs-worktrees-git-status-mode))
-      ;; Cache entry, status, message, and refreshing state for tab switching
-      (setq vibemacs-worktrees-git-status--cached-entry entry)
-      (setq vibemacs-worktrees-git-status--cached-status status-list)
-      (setq vibemacs-worktrees-git-status--cached-message message)
-      (setq vibemacs-worktrees-git-status--cached-refreshing refreshing)
-      ;; Render based on active tab
-      (pcase vibemacs-worktrees-git-status--active-tab
-        ('project-directory
-         (vibemacs-worktrees-git-status--render-project-directory
-          entry message refreshing))
-        (_
-         (vibemacs-worktrees-git-status--render-files-changed entry status-list refreshing message))))
+      ;; Skip redraw if nothing visible would change (prevents flickering)
+      (let* ((same-entry (and vibemacs-worktrees-git-status--cached-entry
+                              (equal (vibemacs-worktrees--entry-root entry)
+                                     (vibemacs-worktrees--entry-root
+                                      vibemacs-worktrees-git-status--cached-entry))))
+             (same-status (equal status-list vibemacs-worktrees-git-status--cached-status))
+             (same-message (equal message vibemacs-worktrees-git-status--cached-message))
+             (same-refreshing (eq refreshing vibemacs-worktrees-git-status--cached-refreshing))
+             (skip (and same-entry
+                        (eq vibemacs-worktrees-git-status--active-tab 'files-changed)
+                        same-status
+                        same-message
+                        same-refreshing)))
+        (unless skip
+          ;; Cache entry, status, message, and refreshing state for tab switching
+          (setq vibemacs-worktrees-git-status--cached-entry entry)
+          (setq vibemacs-worktrees-git-status--cached-status status-list)
+          (setq vibemacs-worktrees-git-status--cached-message message)
+          (setq vibemacs-worktrees-git-status--cached-refreshing refreshing)
+          ;; Render based on active tab
+          (pcase vibemacs-worktrees-git-status--active-tab
+            ('project-directory
+             (vibemacs-worktrees-git-status--render-project-directory
+              entry message refreshing))
+            (_
+             (vibemacs-worktrees-git-status--render-files-changed entry status-list refreshing message))))))
     buffer))
 
 (defun vibemacs-worktrees-git-status--render-files-changed (entry status-list &optional refreshing message)
@@ -447,10 +461,15 @@ When MESSAGE is provided, display it instead of git status."
                       :sentinel #'vibemacs-worktrees-git-status--sentinel))))
         (process-put proc 'entry entry)
         (process-put proc 'root root)
-        (setq vibemacs-worktrees-git-status--process proc))
-
-        ;; Show placeholder while the async process runs.
-        (vibemacs-worktrees-git-status--render entry nil t)))))
+        (setq vibemacs-worktrees-git-status--process proc)
+        ;; Show placeholder only if we don't have cached content for this root
+        (let ((have-cached-content
+               (with-current-buffer (get-buffer-create vibemacs-worktrees-git-status-buffer)
+                 (and vibemacs-worktrees-git-status--cached-entry
+                      (equal root (vibemacs-worktrees--entry-root
+                                   vibemacs-worktrees-git-status--cached-entry))))))
+          (unless have-cached-content
+            (vibemacs-worktrees-git-status--render entry nil t))))))))
 
 ;;; Git Status Auto-Refresh
 

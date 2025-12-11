@@ -131,6 +131,49 @@
       (kill-buffer vibemacs-worktrees-git-status-buffer)
       (delete-directory temp-dir t))))
 
+(ert-deftest vibemacs-worktrees-git-status--refreshing-placeholder-replaced ()
+  "Placeholder render should be replaced by clean state when status is empty."
+  (let* ((entry (vibemacs-worktrees--entry-create
+                 :name "test" :branch "main" :repo "/tmp" :root "/tmp"
+                 :base "" :created "2025-01-01T00:00:00Z"))
+         (vibemacs-worktrees-git-status-buffer (generate-new-buffer " *test-git-status*")))
+    (unwind-protect
+        (with-current-buffer vibemacs-worktrees-git-status-buffer
+          (vibemacs-worktrees-git-status-mode)
+          (setq vibemacs-worktrees-git-status--active-tab 'files-changed)
+          ;; Initial placeholder while refresh in-flight
+          (vibemacs-worktrees-git-status--render entry nil t)
+          ;; Final render should replace placeholder even though status is unchanged (nil)
+          (vibemacs-worktrees-git-status--render entry nil nil)
+          (goto-char (point-min))
+          (should (search-forward "Working tree clean" nil t))
+          (goto-char (point-min))
+          (should-not (search-forward "Refreshing…" nil t)))
+      (kill-buffer vibemacs-worktrees-git-status-buffer))))
+
+(ert-deftest vibemacs-worktrees-git-status--clears-stale-error-message ()
+  "A successful refresh should clear cached error messages when status is empty."
+  (let* ((entry (vibemacs-worktrees--entry-create
+                 :name "test" :branch "main" :repo "/tmp" :root "/tmp"
+                 :base "" :created "2025-01-01T00:00:00Z"))
+         (vibemacs-worktrees-git-status-buffer (generate-new-buffer " *test-git-status*"))
+         (err "git status failed for repo"))
+    (unwind-protect
+        (with-current-buffer vibemacs-worktrees-git-status-buffer
+          (vibemacs-worktrees-git-status-mode)
+          (setq vibemacs-worktrees-git-status--active-tab 'files-changed)
+          ;; Cache an error state
+          (vibemacs-worktrees-git-status--render entry nil nil err)
+          (goto-char (point-min))
+          (should (search-forward err nil t))
+          ;; Successful refresh with empty status should overwrite the message
+          (vibemacs-worktrees-git-status--render entry nil nil nil)
+          (goto-char (point-min))
+          (should-not (search-forward err nil t))
+          (goto-char (point-min))
+          (should (search-forward "Working tree clean" nil t)))
+      (kill-buffer vibemacs-worktrees-git-status-buffer))))
+
 (ert-deftest vibemacs-worktrees-git-status--header-line-shows-active-tab ()
   "Header line should indicate which tab is active."
   (let ((vibemacs-worktrees-git-status-buffer (generate-new-buffer " *test-git-status*")))
