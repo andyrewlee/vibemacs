@@ -281,26 +281,43 @@ ON-FAILURE is called with error message if any command fails."
     (message "[worktrees] Starting setup for worktree: %s" name)
     (message "[worktrees] Root worktree: %s" repo)
     (message "[worktrees] Target path: %s" target-path))
-  (let* ((config (vibemacs-worktrees--read-setup-config repo target-path))
-         (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
-    (when vibemacs-worktrees-setup-verbose-logging
-      (message "[worktrees] Config object: %S" config)
-      (when config
-        (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
-      (message "[worktrees] Commands lookup result: %S" commands)
-      (message "[worktrees] Commands type: %s" (type-of commands))
-      (message "[worktrees] Commands is list: %s" (listp commands))
-      (message "[worktrees] Commands length: %s" (when commands (length commands))))
-    (if (and commands (listp commands) (> (length commands) 0))
+  ;; Wait for worktree to be fully ready (race condition mitigation).
+  ;; Git worktree add can return before the .git file is fully written.
+  (let ((git-file (expand-file-name ".git" target-path))
+        (attempts 0)
+        (max-attempts 10))
+    (while (and (< attempts max-attempts)
+                (not (file-exists-p git-file)))
+      (setq attempts (1+ attempts))
+      (when vibemacs-worktrees-setup-verbose-logging
+        (message "[worktrees] Waiting for worktree .git file (attempt %d/%d)..." attempts max-attempts))
+      (sleep-for 0.1))
+    (if (not (file-exists-p git-file))
+        ;; Worktree not ready after all attempts - fail
         (progn
-          (when vibemacs-worktrees-setup-verbose-logging
-            (message "[worktrees] Found %d setup command(s)" (length commands)))
-          ;; Start running commands sequentially
-          (vibemacs-worktrees--run-setup-command commands target-path repo name 0 on-success on-failure))
-      (progn
-        (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json")
-        ;; No setup commands, call success immediately
-        (when on-success (funcall on-success))))))
+          (when on-failure
+            (funcall on-failure (format "Worktree not ready: %s not found after %d attempts" git-file max-attempts))))
+      ;; Worktree ready - proceed with setup
+      (let* ((config (vibemacs-worktrees--read-setup-config repo target-path))
+             (commands (when config (alist-get "setup-worktree" config nil nil #'string=))))
+        (when vibemacs-worktrees-setup-verbose-logging
+          (message "[worktrees] Config object: %S" config)
+          (when config
+            (message "[worktrees] Config keys found: %s" (mapcar #'car config)))
+          (message "[worktrees] Commands lookup result: %S" commands)
+          (message "[worktrees] Commands type: %s" (type-of commands))
+          (message "[worktrees] Commands is list: %s" (listp commands))
+          (message "[worktrees] Commands length: %s" (when commands (length commands))))
+        (if (and commands (listp commands) (> (length commands) 0))
+            (progn
+              (when vibemacs-worktrees-setup-verbose-logging
+                (message "[worktrees] Found %d setup command(s)" (length commands)))
+              ;; Start running commands sequentially
+              (vibemacs-worktrees--run-setup-command commands target-path repo name 0 on-success on-failure))
+          (progn
+            (message "[worktrees] No setup-worktree commands found in .vibemacs/worktrees.json")
+            ;; No setup commands, call success immediately
+            (when on-success (funcall on-success))))))))
 
 ;;; Worktree Creation and Archival
 
