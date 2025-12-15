@@ -628,6 +628,13 @@ _EVENT is the mouse event when invoked via mouse click (ignored)."
             (vibemacs-worktrees--unregister root)
             (remhash root vibemacs-worktrees--transcript-buffers)
             (vibemacs-worktrees-launch-home)
+            ;; Keep focus in the left dashboard pane after returning home.
+            (when (window-live-p vibemacs-worktrees--dashboard-window)
+              (select-window vibemacs-worktrees--dashboard-window)
+              (when (fboundp 'evil-refresh-cursor)
+                (evil-refresh-cursor))
+              (when (bound-and-true-p hl-line-mode)
+                (hl-line-highlight)))
             (if warnings
                 (message "Deleted worktree %s (warnings: %s)"
                          (vibemacs-worktrees--entry-name entry)
