@@ -34,6 +34,29 @@ Defaults to `default-directory'."
         (vibemacs-worktrees--call-git dir "rev-parse" "--show-toplevel")
       (error nil))))
 
+(defun vibemacs-worktrees--git-common-dir (&optional directory)
+  "Return the absolute git common dir for DIRECTORY, or nil."
+  (let ((dir (expand-file-name (or directory default-directory))))
+    (condition-case nil
+        (let* ((raw (vibemacs-worktrees--call-git dir "rev-parse" "--git-common-dir"))
+               (resolved (if (file-name-absolute-p raw)
+                             raw
+                           (expand-file-name raw dir))))
+          (expand-file-name resolved))
+      (error nil))))
+
+(defun vibemacs-worktrees--root-worktree (&optional directory)
+  "Return the primary worktree root for DIRECTORY.
+Falls back to the git toplevel when the common dir is unavailable."
+  (let* ((dir (expand-file-name (or directory default-directory)))
+         (common (vibemacs-worktrees--git-common-dir dir)))
+    (cond
+     ((and common
+           (string= (file-name-nondirectory (directory-file-name common)) ".git"))
+      (directory-file-name (file-name-directory (directory-file-name common))))
+     (t
+      (or (vibemacs-worktrees--git-root dir) dir)))))
+
 (defun vibemacs-worktrees--normalize-head (ref)
   "Return REF without refs/heads/ prefix when present."
   (when ref
