@@ -602,9 +602,10 @@ _EVENT is the mouse event when invoked via mouse click (ignored)."
                     (directory-file-name (expand-file-name root))
                     (directory-file-name (expand-file-name repo))))
           (user-error "Cannot delete the primary checkout from vibemacs"))
-        (when (yes-or-no-p (format "Delete worktree %s and branch %s? "
-                                   (abbreviate-file-name root)
-                                   (if (and branch (not (string-empty-p branch))) branch "(none)")))
+        (when (vibemacs-worktrees--confirm-delete
+               (format "Delete worktree %s and branch %s? "
+                       (abbreviate-file-name root)
+                       (if (and branch (not (string-empty-p branch))) branch "(none)")))
           (let ((warnings nil))
             ;; Try git worktree remove first, fall back to rm -rf for deep node_modules
             (condition-case err

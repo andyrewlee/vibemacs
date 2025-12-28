@@ -219,6 +219,11 @@ When set to `none', stay within the diff buffer that is already shown."
   (unless (file-directory-p vibemacs-worktrees-root)
     (make-directory vibemacs-worktrees-root t)))
 
+(defun vibemacs-worktrees--confirm-delete (prompt)
+  "Ask PROMPT, requiring an explicit yes or no response."
+  (let ((use-short-answers nil))
+    (yes-or-no-p prompt)))
+
 (defun vibemacs-worktrees--default-target-directory (repo name)
   "Return directory path for new worktree NAME.
 Placed under `vibemacs-worktrees-root', grouped by repository name."

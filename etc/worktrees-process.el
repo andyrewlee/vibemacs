@@ -409,8 +409,8 @@ ON-FAILURE is called with error message if any command fails."
   (let* ((root (vibemacs-worktrees--entry-root entry))
          (repo (vibemacs-worktrees--entry-repo entry))
          (branch (vibemacs-worktrees--entry-branch entry)))
-    (unless (yes-or-no-p (format "Remove worktree %s and branch %s? "
-                                 root branch))
+    (unless (vibemacs-worktrees--confirm-delete
+             (format "Remove worktree %s and branch %s? " root branch))
       (user-error "Archive cancelled"))
     (vibemacs-worktrees--call-git repo "worktree" "remove" "--force" root)
     (ignore-errors
